@@ -1,5 +1,6 @@
 import * as vscode from 'vscode';
 import { OllamaClient } from '../services/OllamaClient';
+import { CrashShield } from '../utils/CrashShield';
 
 export class AutocompleteProvider implements vscode.InlineCompletionItemProvider {
     private debounceTimer: NodeJS.Timeout | null = null;
@@ -14,11 +15,16 @@ export class AutocompleteProvider implements vscode.InlineCompletionItemProvider
     public provideInlineCompletionItems(
         document: vscode.TextDocument,
         position: vscode.Position,
-        context: vscode.InlineCompletionContext,
+        _context: vscode.InlineCompletionContext,
         token: vscode.CancellationToken
     ): Promise<vscode.InlineCompletionList | null> {
         
         return new Promise((resolve) => {
+            // Cancel execution if CrashShield is pausing autocomplete triggers to preserve host operating stability
+            if (CrashShield.isAutocompletePaused()) {
+                return resolve(null);
+            }
+
             // Cancel any pending debounce timer
             if (this.debounceTimer) {
                 clearTimeout(this.debounceTimer);

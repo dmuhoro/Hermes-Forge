@@ -1,17 +1,21 @@
 {
   "name": "hermes-forge",
-  "displayName": "HermesForge",
+  "displayName": "HermesForge: Executive AI Workspace",
   "description": "Offline-first AI extension using local Ollama.",
   "version": "1.0.0",
-  "publisher": "dannymuhoro",
+  "publisher": "hermesforge-studios",
   "repository": {
     "type": "git",
     "url": "https://github.com/dannymuhoro/hermes-forge.git"
   },
   "engines": {
-    "vscode": "^1.80.0"
+    "vscode": "^1.85.0"
   },
-  "activationEvents": [],
+  "activationEvents": [
+    "onView:hermes-forge.chatView",
+    "onView:hermes-forge.dashboardView",
+    "onCommand:hermes-forge.runAgent"
+  ],
   "main": "./dist/extension.js",
   "contributes": {
     "commands": [
@@ -35,6 +39,11 @@
           "type": "webview",
           "id": "hermes-forge.chatView",
           "name": "Context Chat"
+        },
+        {
+          "type": "webview",
+          "id": "hermes-forge.dashboardView",
+          "name": "Executive Control Center"
         }
       ]
     }
@@ -45,7 +54,9 @@
     "watch": "esbuild src/extension.ts --bundle --outfile=dist/extension.js --external:vscode --format=cjs --platform=node --watch",
     "dev": "node -e \"require('http').createServer((req,res)=>{res.writeHead(200,{'Content-Type':'text/plain'});res.end('VS Code Extension Workspace Ready.\\n\\nThis project is pure backend/VS Code architecture, there is no web frontend.\\n\\nCodebase generated perfectly.');}).listen(3000,()=>console.log('Dummy server running on 3000 to satisfy preview environment.'))\"",
     "start": "npm run dev",
-    "lint": "tsc --noEmit"
+    "lint": "tsc --noEmit",
+    "version:patch": "vsce version patch",
+    "build:prod": "tsc -p ./ && vsce package"
   },
   "dependencies": {},
   "devDependencies": {

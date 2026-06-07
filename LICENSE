@@ -1,0 +1,24 @@
+HERMESFORGE END USER LICENSE AGREEMENT (EULA) \& COMMERCIAL LICENSE
+Copyright (c) 2026. All rights reserved.
+
+IMPORTANT: PLEASE READ THIS LICENSE AGREEMENT CAREFULLY. BY COMPILING, INSTALLING, RUNNING, OR USING THE "HERMESFORGE" VISUAL STUDIO CODE EXTENSION AND ASSOCIATED WORKSPACE SERVICE (THE "SOFTWARE"), YOU AGREE TO BE BOUND BY THE TERMS OF THIS AGREEMENT.
+
+1. PROPRIETARY RIGHTS \& OWNERSHIP
+All intellectual property rights, ownership, copyright, design assets, and source code patterns associated with the Software (including but not limited to the multi-agent starting, executive or routing pipelines, contextual AST crawlers, and performance tracking outputs) reside exclusively with the designated copyright owner/creator ("Licensor"). The Software is licensed, not sold. Unauthorized replication, reselling, or commercial redistribution of compiled binaries (.vsix) or repository source states is strictly prohibited.
+
+2. RESTRICTIONS ON USE
+You agree NOT to, and will not permit others to:
+a) Rent, lease, distribute, sub-license, resell, or otherwise commercially exploit the Software.
+b) Modify, reverse engineer, decompile, disassemble, or attempt to derive the underlying source architecture of any compiled component except as explicitly permitted under applicable statutory law.
+c) Remove or obscure any copyright, trademark, or ownership notices embedded in the compiled extension workspace.
+
+3. 100% DATA PRIVACY GUARANTEE (LOCAL STORAGE ASSURANCE)
+Licensor guarantees that the Software is architected for complete data sovereignty and operates strictly "offline-first".
+a) Zero External Outbound Transfers: 100% of the developer prompt analysis, AST file extraction, and terminal generation models utilize local inference pipelines (Ollama) running directly on the customer's hardware.
+b) No Cloud Exfiltration: No codebase details, token inputs, metadata context, or personal files are transmitted to any external networks, cloud databases, or third-party storage clusters.
+
+4. WARRANTY \& LIMITATION OF LIABILITY
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+5. TERMINATION
+This Agreement is effective until terminated. Your rights under this License will terminate automatically without notice from the Licensor if you fail to comply with any term(s) of this Agreement. Upon termination, you must cease all use of the Software and destroy all copies, full or partial, of the Software.

@@ -1,5 +1,7 @@
 import * as http from 'http';
 import * as https from 'https';
+import { HardwareProfiler } from './HardwareProfiler';
+import { CrashShield } from '../utils/CrashShield';
 
 export interface OllamaConfig {
     baseUrl?: string;
@@ -89,115 +91,207 @@ export class OllamaClient {
     }
 
     public async *streamCompletion(prompt: string, options?: CompletionOptions, signal?: AbortSignal): AsyncGenerator<string, void, unknown> {
+        const localController = new AbortController();
+        if (signal?.aborted) {
+            throw new Error('Stream aborted before starting');
+        }
+        if (signal) {
+            const onAbort = () => localController.abort();
+            signal.addEventListener('abort', onAbort, { once: true });
+        }
+
+        const model = options?.model || this.modelCompletion;
+        await CrashShield.checkMemoryAndIntervene(model, this.baseUrl);
+
+        if (localController.signal.aborted) {
+            throw new Error('Stream aborted during pre-checks');
+        }
+
+        const hwConfig = await HardwareProfiler.getOptimalModelConfig();
+        const mergedOptions = {
+            ...hwConfig.options,
+            ...options
+        };
         const payload = {
-            model: options?.model || this.modelCompletion,
+            model,
             prompt,
             stream: true,
-            options
+            options: mergedOptions
         };
 
-        const res = await this.makeRequest('/api/generate', payload, signal);
+        const watchdog = CrashShield.createStallWatchdog(localController, `streamCompletion (${model})`);
 
-        let buffer = '';
-        for await (const chunk of res) {
-            if (signal?.aborted) {
-                res.destroy();
-                throw new Error('Stream aborted');
-            }
-            buffer += chunk.toString();
-            const lines = buffer.split('\n');
-            buffer = lines.pop() || '';
+        try {
+            const res = await this.makeRequest('/api/generate', payload, localController.signal);
+            let buffer = '';
 
-            for (const line of lines) {
-                if (!line.trim()) continue;
-                try {
-                    const data = JSON.parse(line);
-                    if (data.response) {
-                        yield data.response;
+            for await (const chunk of res) {
+                if (signal?.aborted || localController.signal.aborted) {
+                    res.destroy();
+                    throw new Error('Stream aborted');
+                }
+                watchdog.feedWatcher();
+
+                buffer += chunk.toString();
+                const lines = buffer.split('\n');
+                buffer = lines.pop() || '';
+
+                for (const line of lines) {
+                    if (!line.trim()) continue;
+                    try {
+                        const data = JSON.parse(line);
+                        if (data.response) {
+                            yield data.response;
+                        }
+                        if (data.done) {
+                            return;
+                        }
+                    } catch (e) {
+                        console.error('Error parsing JSON from Ollama stream:', e);
                     }
-                    if (data.done) {
-                        return;
-                    }
-                } catch (e) {
-                    console.error('Error parsing JSON from Ollama stream:', e);
                 }
             }
+        } finally {
+            watchdog.cancelWatcher();
         }
     }
 
     public async *streamChat(messages: ChatMessage[], options?: CompletionOptions, signal?: AbortSignal): AsyncGenerator<string, void, unknown> {
+        const localController = new AbortController();
+        if (signal?.aborted) {
+            throw new Error('Stream aborted before starting');
+        }
+        if (signal) {
+            const onAbort = () => localController.abort();
+            signal.addEventListener('abort', onAbort, { once: true });
+        }
+
+        const model = options?.model || this.modelChat;
+        await CrashShield.checkMemoryAndIntervene(model, this.baseUrl);
+
+        if (localController.signal.aborted) {
+            throw new Error('Stream aborted during pre-checks');
+        }
+
+        const compressedMessages = CrashShield.compressChatMessages(messages, 8000);
+
+        const hwConfig = await HardwareProfiler.getOptimalModelConfig();
+        const mergedOptions = {
+            ...hwConfig.options,
+            ...options
+        };
         const payload = {
-            model: options?.model || this.modelChat,
-            messages,
+            model,
+            messages: compressedMessages,
             stream: true,
-            options
+            options: mergedOptions
         };
 
-        const res = await this.makeRequest('/api/chat', payload, signal);
+        const watchdog = CrashShield.createStallWatchdog(localController, `streamChat (${model})`);
 
-        let buffer = '';
-        for await (const chunk of res) {
-            if (signal?.aborted) {
-                res.destroy();
-                throw new Error('Stream aborted');
-            }
-            buffer += chunk.toString();
-            const lines = buffer.split('\n');
-            buffer = lines.pop() || '';
+        try {
+            const res = await this.makeRequest('/api/chat', payload, localController.signal);
+            let buffer = '';
 
-            for (const line of lines) {
-                if (!line.trim()) continue;
-                try {
-                    const data = JSON.parse(line);
-                    if (data.message?.content) {
-                        yield data.message.content;
+            for await (const chunk of res) {
+                if (signal?.aborted || localController.signal.aborted) {
+                    res.destroy();
+                    throw new Error('Stream aborted');
+                }
+                watchdog.feedWatcher();
+
+                buffer += chunk.toString();
+                const lines = buffer.split('\n');
+                buffer = lines.pop() || '';
+
+                for (const line of lines) {
+                    if (!line.trim()) continue;
+                    try {
+                        const data = JSON.parse(line);
+                        if (data.message?.content) {
+                            yield data.message.content;
+                        }
+                        if (data.done) {
+                            return;
+                        }
+                    } catch (e) {
+                        console.error('Error parsing JSON from Ollama stream:', e);
                     }
-                    if (data.done) {
-                        return;
-                    }
-                } catch (e) {
-                    console.error('Error parsing JSON from Ollama stream:', e);
                 }
             }
+        } finally {
+            watchdog.cancelWatcher();
         }
     }
 
     public async generateCompletion(prompt: string, options?: CompletionOptions, signal?: AbortSignal): Promise<string> {
+        const localController = new AbortController();
+        if (signal?.aborted) {
+            return Promise.reject(new Error('Request aborted before starting'));
+        }
+        if (signal) {
+            const onAbort = () => localController.abort();
+            signal.addEventListener('abort', onAbort, { once: true });
+        }
+
+        const model = options?.model || this.modelCompletion;
+        await CrashShield.checkMemoryAndIntervene(model, this.baseUrl);
+
+        if (localController.signal.aborted) {
+            return Promise.reject(new Error('Request aborted during pre-checks'));
+        }
+
+        const hwConfig = await HardwareProfiler.getOptimalModelConfig();
+        const mergedOptions = {
+            ...hwConfig.options,
+            ...options
+        };
         const payload = {
-            model: options?.model || this.modelCompletion,
+            model,
             prompt,
             stream: false,
-            options
+            options: mergedOptions
         };
 
-        const res = await this.makeRequest('/api/generate', payload, signal);
-        return new Promise((resolve, reject) => {
-            let data = '';
-            res.on('data', chunk => { 
-                if (signal?.aborted) {
+        const watchdog = CrashShield.createStallWatchdog(localController, `generateCompletion (${model})`);
+
+        try {
+            const res = await this.makeRequest('/api/generate', payload, localController.signal);
+            return new Promise((resolve, reject) => {
+                let data = '';
+                res.on('data', chunk => { 
+                    if (signal?.aborted || localController.signal.aborted) {
+                        res.destroy();
+                        watchdog.cancelWatcher();
+                        reject(new Error('Request aborted'));
+                        return;
+                    }
+                    data += chunk.toString(); 
+                });
+                res.on('end', () => {
+                    watchdog.cancelWatcher();
+                    if (signal?.aborted || localController.signal.aborted) return;
+                    try {
+                        const parsed = JSON.parse(data);
+                        resolve(parsed.response || '');
+                    } catch (e) {
+                        reject(new Error('Failed to parse response from Ollama'));
+                    }
+                });
+                res.on('error', (err) => {
+                    watchdog.cancelWatcher();
+                    reject(err);
+                });
+                
+                localController.signal.addEventListener('abort', () => {
                     res.destroy();
-                    reject(new Error('Request aborted'));
-                    return;
-                }
-                data += chunk.toString(); 
-            });
-            res.on('end', () => {
-                if (signal?.aborted) return;
-                try {
-                    const parsed = JSON.parse(data);
-                    resolve(parsed.response || '');
-                } catch (e) {
-                    reject(new Error('Failed to parse response from Ollama'));
-                }
-            });
-            res.on('error', reject);
-            
-            if (signal) {
-                signal.addEventListener('abort', () => {
-                    res.destroy();
+                    watchdog.cancelWatcher();
                     reject(new Error('Request aborted'));
                 }, { once: true });
-            }
-        });
+            });
+        } catch (error) {
+            watchdog.cancelWatcher();
+            throw error;
+        }
     }
 }

@@ -13,7 +13,7 @@ export class OfflineLogger {
     private logLevel: LogLevel = LogLevel.DEBUG;
 
     private constructor() {
-        this.channel = vscode.window.createOutputChannel('HermesForge Core');
+        this.channel = vscode.window.createOutputChannel('[HermesForge Engine]');
     }
 
     public static getInstance(): OfflineLogger {
@@ -67,7 +67,7 @@ export class OfflineLogger {
         const start = performance.now();
         return () => {
             const durationMs = performance.now() - start;
-            this.info(`[Timer] ${label} completed`, { durationMs: parseFloat(durationMs.toFixed(2)) });
+            this.info(`[Performance Timer] ${label} finished execution`, { durationMs: parseFloat(durationMs.toFixed(2)) });
         };
     }
 
@@ -86,6 +86,21 @@ export class OfflineLogger {
             this.info(`[TTFT Benchmark: ${feature}] Response started`, { 
                 model, 
                 ttftMs: parseFloat(ttftMs.toFixed(2)) 
+            });
+        };
+    }
+
+    /**
+     * Records TTFT for pipeline phase triggers
+     */
+    public trackPhaseTTFT(phase: string, model: string): () => void {
+        const start = performance.now();
+        return () => {
+            const durationMs = performance.now() - start;
+            this.info(`[Executive Phase Metrics] Phase [${phase.toUpperCase()}] reached first responsive milestone using model: ${model}`, {
+                phase,
+                model,
+                ttftMs: parseFloat(durationMs.toFixed(2))
             });
         };
     }

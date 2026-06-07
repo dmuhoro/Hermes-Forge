@@ -2,6 +2,7 @@ import * as vscode from 'vscode';
 import { OllamaClient } from './services/OllamaClient';
 import { AutocompleteProvider } from './modules/AutocompleteProvider';
 import { ChatWebviewProvider } from './modules/ChatWebviewProvider';
+import { DashboardViewProvider } from './modules/DashboardViewProvider';
 import { AgentEngine, activeSubprocesses } from './modules/AgentEngine';
 import { AgentRouter } from './services/AgentRouter';
 
@@ -30,6 +31,15 @@ export function activate(context: vscode.ExtensionContext) {
         { webviewOptions: { retainContextWhenHidden: true } }
     );
     context.subscriptions.push(chatView);
+
+    // Register Sidebar Core Dashboard View
+    const dashboardProvider = new DashboardViewProvider(context.extensionUri, ollama);
+    const dashboardView = vscode.window.registerWebviewViewProvider(
+        DashboardViewProvider.viewType,
+        dashboardProvider,
+        { webviewOptions: { retainContextWhenHidden: true } }
+    );
+    context.subscriptions.push(dashboardView);
 
     // Initialize the Multi-Agent Router and wire it back to the sidebar chat
     const agentRouter = new AgentRouter(ollama, sidebarProvider);

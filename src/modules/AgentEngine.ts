@@ -4,6 +4,7 @@ import * as fs from 'fs/promises';
 import * as path from 'path';
 import { OllamaClient, ChatMessage } from '../services/OllamaClient';
 import { logger } from '../utils/Logger';
+import { SecurityGuard } from '../utils/SecurityGuard';
 
 export const activeSubprocesses: cp.ChildProcess[] = [];
 
@@ -182,19 +183,29 @@ Once you have gathered enough information and completed the goal, respond with y
                             toolResult = await this.writeFile(toolCall.arguments.path, toolCall.arguments.content);
                         } else if (toolCall.name === 'executeCommand') {
                             const command = toolCall.arguments.command;
-                            const choice = await vscode.window.showWarningMessage(
-                                `Agent wants to execute command:\n\n${command}`,
-                                { modal: true },
-                                "Approve Run",
-                                "Reject & Cancel Loop"
-                            );
-
-                            if (choice === "Approve Run") {
-                                toolResult = await this.executeCommand(command);
+                            
+                            // Audit the generated terminal string against the regex blacklist
+                            const securityCheck = SecurityGuard.validateCommand(command);
+                            if (!securityCheck.isSafe) {
+                                const errMessage = securityCheck.reason || 'Security Infraction blocked by SecurityGuard.';
+                                vscode.window.showErrorMessage(`[HermesForge Security Safeguard] ${errMessage}`);
+                                this.outputChannel.appendLine(`\n🚨 [SECURITY INFRACTION BLOCKED]: ${errMessage}`);
+                                toolResult = `Execution Gated: ${errMessage}`;
                             } else {
-                                logger.error(`Agent execution rejected by user. Command: ${command}`);
-                                this.outputChannel.appendLine(`\n[Agent Terminated]: Loop cancelled by user due to rejected execution.`);
-                                break;
+                                const choice = await vscode.window.showWarningMessage(
+                                    `Agent wants to execute command:\n\n${command}`,
+                                    { modal: true },
+                                    "Approve Run",
+                                    "Reject & Cancel Loop"
+                                );
+
+                                if (choice === "Approve Run") {
+                                    toolResult = await this.executeCommand(command);
+                                } else {
+                                    logger.error(`Agent execution rejected by user. Command: ${command}`);
+                                    this.outputChannel.appendLine(`\n[Agent Terminated]: Loop cancelled by user due to rejected execution.`);
+                                    break;
+                                }
                             }
                         } else {
                             toolResult = `Error: Tool '${toolCall.name}' not found.`;
