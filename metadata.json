@@ -1,0 +1,8 @@
+{
+  "name": "Offline AI IDE",
+  "description": "An offline-first VS Code Extension Workspace leveraging Ollama, combining Context Chat, Agentic Execution, and Inline Autocomplete functionalities.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
