@@ -9,7 +9,7 @@ export interface ChatMessage {
 }
 
 export class CrashShield {
-    private static readonly LOW_MEM_THRESHOLD = 1.5 * 1024 * 1024 * 1024; // 1.5 GB in bytes
+    private static readonly LOW_MEM_THRESHOLD = 1.2 * 1024 * 1024 * 1024; // 1.2 GB in bytes
     private static autocompletePaused = false;
     private static pauseTimer: NodeJS.Timeout | null = null;
 
@@ -133,7 +133,7 @@ export class CrashShield {
 
     /**
      * Attaches a watchdog timer that restarts whenever new stream responses arrive.
-     * Aborts execution if no incoming token arrives for 15 seconds.
+     * Aborts execution if no incoming token arrives for 12 seconds.
      */
     public static createStallWatchdog(abortController: AbortController, label: string = 'Inference Stream'): { feedWatcher: () => void; cancelWatcher: () => void } {
         let watchTimer: NodeJS.Timeout | null = null;
@@ -143,10 +143,10 @@ export class CrashShield {
                 clearTimeout(watchTimer);
             }
             watchTimer = setTimeout(() => {
-                logger.error(`[CrashShield] STALL ALERT: "${label}" did not output a token for 15 seconds. Triggering abort cancel signal.`);
+                logger.error(`[CrashShield] STALL ALERT: "${label}" did not output a token for 12 seconds. Triggering abort cancel signal.`);
                 vscode.window.showErrorMessage(`[HermesForge CrashShield] Stalled Local Model process aborted to prevent Host freeze.`);
                 abortController.abort();
-            }, 15000);
+            }, 12000);
         };
 
         const feedWatcher = () => {
