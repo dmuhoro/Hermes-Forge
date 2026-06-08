@@ -309,13 +309,43 @@ export class ChatWebviewProvider implements vscode.WebviewViewProvider {
                          .replace(/'/g, "&#039;");
                 }
 
-                // Simple markdown formatter to handle code blocks
-                function formatMessage(text) {
-                    const escaped = escapeHtml(text);
-                    // Minimal formatting for code blocks
-                    return escaped.replace(/&#x60;&#x60;&#x60;([\\w]*)\\n([\\s\\S]*?)&#x60;&#x60;&#x60;/g, '<pre><code>$2</code></pre>')
-                                  .replace(/&#x60;([^&#x60;]+)&#x60;/g, '<code>$1</code>');
-                }
+                 // Simple markdown formatter to handle code blocks
+                 function formatMessage(text) {
+                     const parts = text.split('\`\`\`');
+                     let html = '';
+                     
+                     for (let i = 0; i < parts.length; i++) {
+                         if (i % 2 === 1) {
+                             // This is inside a code block (even if the closing \`\`\` hasn't arrived yet)
+                             const part = parts[i];
+                             const firstNewline = part.indexOf('\n');
+                             let lang = 'code';
+                             let code = part;
+                             
+                             if (firstNewline !== -1) {
+                                 lang = part.substring(0, firstNewline).trim();
+                                 code = part.substring(firstNewline + 1);
+                             }
+                             
+                             html += '<pre class="code-block-container" style="background: var(--code-bg); padding: 10px; border-radius: 4px; border: 1px solid var(--border-color); margin: 8px 0; overflow-x: auto;"><div style="font-size: 10px; color: var(--user-msg-color); text-transform: uppercase; margin-bottom: 4px; border-bottom: 1px solid var(--border-color); padding-bottom: 4px; font-family: sans-serif;">' + (lang || 'code') + '</div><code style="font-family: var(--vscode-editor-font-family, monospace); font-size: 12px; white-space: pre;">' + escapeHtml(code) + '</code></pre>';
+                         } else {
+                             // Normal inline text
+                             const part = parts[i];
+                             const inlineParts = part.split('\`');
+                             let textHtml = '';
+                             
+                             for (let j = 0; j < inlineParts.length; j++) {
+                                 if (j % 2 === 1) {
+                                     textHtml += '<code style="background: var(--code-bg); padding: 2px 4px; border-radius: 3px; font-family: var(--vscode-editor-font-family, monospace);">' + escapeHtml(inlineParts[j]) + '</code>';
+                                 } else {
+                                     textHtml += escapeHtml(inlineParts[j]);
+                                 }
+                             }
+                             html += textHtml;
+                         }
+                     }
+                     return html;
+                 }
 
                 function autoResize() {
                     promptInput.style.height = 'auto';
@@ -379,8 +409,8 @@ export class ChatWebviewProvider implements vscode.WebviewViewProvider {
                     } else if (msg.type === 'streamChunk') {
                         if (currentAiContent) {
                             rawStreamContent += msg.value;
-                            // Update live, simple pre-wrap handles most streams fine until complete
-                            currentAiContent.textContent = rawStreamContent;
+                            // Update live character-by-character styled via our incremental formatter
+                            currentAiContent.innerHTML = formatMessage(rawStreamContent);
                             scrollToBottom();
                         }
                     } else if (msg.type === 'endStream') {
