@@ -4,6 +4,25 @@
 
 HermesForge merges the capabilities of real-time Context Chat (Cursor), Agentic Execution (Claude Code), and Inline Autocomplete (Codex)—all powered entirely 100% offline via local LLM instances utilizing the Ollama API layer.
 
+```text
+ ┌──────────────────────────────────────┐  ┌──────────────────────────────────────┐
+ │          1. CONTEXT CHAT             │  │      2. EXECUTIVE CONTROL CENTER     │
+ ├──────────────────────────────────────┤  ├──────────────────────────────────────┤
+ │ 👤 User: Migrate auth-helper.js      │  │ CONNECTION STATUS: 🟢 localhost:11434│
+ │                                      │  │                                      │
+ │ 🤖 HermesForge:                      │  │ [ ACTIVE SELECTED MISSIONS ]         │
+ │    Understood. Booting the Legacy    │  │ ┌──────────────────────────────────┐ │
+ │    Migrator persona...                │  │ │ 🔄 JS-to-TS Legacy Migrator      │ │
+ │                                      │  │ ├──────────────────────────────────┤ │
+ │    [1] Isolate modules.              │  │ │ ⚡ Algorithmic Bottleneck Auditor│ │
+ │    [2] Synthesize Type Interfaces.  │  │ ├──────────────────────────────────┤ │
+ │    [3] Compile Unit Tests.           │  │ │ 🧪 Hardware Speed Benchmark     │ │
+ │                                      │  │ ├──────────────────────────────────┤ │
+ │ 🟢 SUCCESS: src/auth-helper.ts       │  │ │ 📦 Differential Git PR Builder   │ │
+ │             src/auth-helper.test.ts  │  │ └──────────────────────────────────┘ │
+ └──────────────────────────────────────┘  └──────────────────────────────────────┘
+```
+
 ---
 
 ## 🏗️ Core Architecture & Optimizations
@@ -24,6 +43,47 @@ The Agent Engine creates a tight loop capable of editing code and running bash c
 
 ---
 
+## 🛠 Model Routing Configuration Settings
+
+Customize connection URLs, context heights, or model candidates dynamically inside VS Code Settings (`Cmd+,` > Search for `HermesForge`):
+
+| Setting Key | Default Value | Description |
+| :--- | :--- | :--- |
+| `hermes-forge.ollamaBaseUrl` | `http://localhost:11434` | The target local URL address running Ollama. |
+| `hermes-forge.modelCompletion` | `qwen2.5-coder:1.5b` | Ultra-low latency model utilized for rapid inline autocompletion. |
+| `hermes-forge.modelChat` | `hermes3:8b` | Strong reasoning model used for chat conversations and multi-agent systems. |
+
+---
+
+## 🚀 Specialized AI Missions (Bento Actions)
+
+Our specialized missions can be triggered instantly from the **Executive Control Dashboard** located in the sidebar panel:
+
+### 🔄 JavaScript-to-TypeScript Migrator
+Saves hours of refactoring by converting untyped legacy Javascript code into fully-typed TS modules.
+- Generates clean types, interfaces, and function signatures.
+- Automatically creates companion `vitest` unit-test files next to the migrated code.
+- Runs verification compilation loops using `VerificationEngine` for error self-healing.
+
+### ⚡️ Algorithmic Bottleneck Auditor
+Scans the active editor document for time/space complexity vectors, memory leaks, and performance thrashes.
+- Details complexity shifts (e.g. optimizing $O(N^2)$ down to $O(N)$).
+- Flags unclosed event listeners or streams and offers optimized refactored alternatives inside `PERF_AUDIT.md`.
+
+### 🧪 Hardware Speed Benchmark
+Profiles your hardware compute capabilities by running localized streaming speed tests against your local Ollama connection.
+- Measures tokens processing speed (Words Per Second).
+- Calculates latency to Time-To-First-Token (TTFT) in milliseconds.
+- Detects host memory size to assign compute worker allocations automatically.
+
+### 📦 Differential Git PR Builder
+Inspects current git states dynamically to compile release metadata.
+- Outputs standardized, professional Conventional Commit statements.
+- Drafts descriptive summaries for pull requests and updates `CHANGELOG.md` automatically.
+- Gated securely behind hard resets to enable safe one-click rollbacks of workspace experiments.
+
+---
+
 ## 🛠 Troubleshooting Matrix
 
 Developing with local models can sometimes have hardware-level bottlenecks. Consult this matrix for common offline infrastructure states:
@@ -36,49 +96,20 @@ Developing with local models can sometimes have hardware-level bottlenecks. Cons
 
 ---
 
-## 🚀 Sprint Roadmap
-
-Our current sprint establishes the local-first abstraction layer.
-
-- [x] **Inline Autocomplete Module**: Integrated Qwen-2.5-Coder Fill-In-The-Middle (FIM) formatting with AbortController slicing.
-- [x] **Sidebar Context Chat**: Webview-based bridging with real-time UI streaming and TextSelection scope injection.
-- [x] **Agentic Terminal Engine**: Hermes-3-based loop with strictly defined JSON Tool Calls (`readFile`, `writeFile`, `executeCommand`).
-- [x] **Interactive Safety Gates**: Prompt-to-Execute interception module stopping dangerous bash commands.
-- [x] **TTFT Telemetry Logging**: Ultra-clean local performance measurement bypassing VS Code's analytics engine.
-- [x] **Agentic File-Tree RAG (Sprint 4)**: Vector-db-less retrieval by having the Agent recursively crawl file dependencies.
-- [x] **Multi-Agent Deliberation (Sprint 5)**: Having a router agent allocate tasks dynamically to a small FIM model vs a deep reasoning model based on context.
-
----
-
-## 🧠 Intelligent Model Routing Architecture
-
-To maximize local hardware performance and prevent GPU memory exhaustion, HermesForge utilizes a dynamic deliberation router:
-1. **Zero-Latency Orchestration**: Upon submission, the `AgentRouter` classifies the user's prompt by evaluating natural language intent in under 10ms.
-2. **Qwen-2.5-Coder (1.5B) for Quick Edits**: Simple requests like "autocomplete this line" or "fix syntax typo" are instantly delegated to the lightning-fast 1.5B parameters model.
-3. **Hermes-3 (8B) for Logic & Agents**: Deep logic questions and complex refactors trigger the heavier 8B reasoning models. If an execution loop is requested (such as writing several files or running terminal commands), the router offloads the task into the background `AgentEngine` loop, freeing up the frontend UI thread.
-
----
-
 ## 📦 Packaging & Installation (.vsix)
 
 Ready to use HermesForge daily across all your workspaces without running a debugger window? You can compile the repository into a standalone `.vsix` bundle and side-load it into your main VS Code instance.
 
-### 1. Install VSCE (VS Code Extension Manager)
-Run this command to install the official Microsoft CLI utility globally:
-```bash
-npm install -g @vscode/vsce
-```
-
-### 2. Package the Extension
+### 1. Packaging Commands
 Compile your workspace into a deployable package. Run this inside the project root:
 ```bash
 npm install
 npm run build
-vsce package --no-dependencies
+npx @vscode/vsce package --no-dependencies
 ```
 *(This will generate a file named `hermes-forge-1.0.0.vsix` in your folder).*
 
-### 3. Sideload into VS Code
+### 2. Sideload into VS Code
 You can install this packaged bundle directly into VS Code via the CLI:
 ```bash
 code --install-extension hermes-forge-1.0.0.vsix
@@ -90,6 +121,50 @@ Alternatively, in VS Code:
 4. Choose your generated `hermes-forge-1.0.0.vsix`.
 
 _Now you can close your development window and hit `Cmd+Shift+P > HermesForge: Run Local Agent` in any project!_
+
+---
+
+## 🧑‍💻 Advanced Integrations & External Tool Hook-ins
+
+HermesForge is built to be a server-authoritative hub for all your offline coding tools.
+
+### 1. EasyTutor Offline Assistant
+We provide a standalone educational tutor utility loop located in `scripts/demo_easytutor.js`. It queries the local HermesForge OpenClaw Server Node (at port `11435`) to securely extract the developer's working context and generates local training sheets:
+- **Run the tutor**: Ensure `nodeEnabled` is true in settings, and run:
+  ```bash
+  node scripts/demo_easytutor.js
+  ```
+- EasyTutor will download code snippets via the bridge, run reflection assessments through Ollama, and save the resulting tutorial workbook at `.telemetry/easytutor_lesson.md`.
+
+### 2. Exporting Workspace Context for External Agents
+Want to feed your entire, clean workspace codebase directly into larger offline agent chains like AutoGen, LangGraph, or local DeepSeek pipelines? 
+- Use the command **`HermesForge: Export Workspace Context for External Agents`** (`hermes-forge.exportContext`).
+- This command crawls the directories, filters out binaries and node dependencies, reads the text entries, and packages them into a beautifully structured, offline-safe JSON context index saved at `.telemetry/project_context.json`.
+
+---
+
+## 💎 Premium Tier & Open-Source Sponsorship
+
+HermesForge is built by developers, for developers under the **MIT License**. We guarantee that core autocomplete, local agentic execution loops, and benchmark gauges will remain free and fully offline forever.
+
+To support rapid engineering cycles, we offer two premium opt-in configurations that you can toggle directly in the **Executive Control Dashboard**:
+1. **Cloud Fallback Model**: Uses low-cost, secure proxy endpoints to model completions in high-concurrency environments when your local memory capacity hits peak thread thresholds.
+2. **Advanced Semantic RAG**: Boosts prompt intelligence using local embedding models to retrieve relevant files across your entire project workspace.
+
+### 💖 Sponsorship & Donation Nodes
+Support privacy-first developers and help finance the local AI revolution!
+- [Support us on GitHub Sponsors](https://github.com/sponsors/hermesforge-studios)
+- [Back the project via Buy Me A Coffee](https://buymeacoffee.com/hermesforge)
+
+---
+
+## 🗺️ Product Roadmap v1.x
+
+- [x] Multi-agent task planning loops with self-healing (Sprint v1.0).
+- [x] OpenClaw JSON-RPC / REST bridge node on `:11435`.
+- [x] Fast token benchmarking & speed gauge integrations.
+- [ ] Local semantic search vector store database (Chrome SQLite Vector Ext).
+- [ ] Fine-tuned ultra-small autocomplete weights (700M parameters) package.
 
 ---
 

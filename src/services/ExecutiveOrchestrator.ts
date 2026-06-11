@@ -166,7 +166,7 @@ Output ONLY the markdown file. Zero conversational filler.`;
             if (await fs.stat(targetFilePath).then(() => true).catch(() => false)) {
                 currentFileContent = await fs.readFile(targetFilePath, 'utf8');
             }
-        } catch (ignored) {}
+        } catch {}
 
         const crawler = new ContextCrawler();
         let extendedContextText = '';
@@ -256,7 +256,7 @@ Do not include any other conversations.`;
                     model: this.ollama.modelChat,
                     temperature: 0.1
                 });
-            } catch (error) {
+            } catch {
                 logger.warn('[ExecutiveOrchestrator] QA model busy, running static TS check instead');
                 auditResult = 'PASS'; // Fallback to avoid infinite block
             }
@@ -426,7 +426,7 @@ Respond ONLY with the markdown file content. No extra conversational wrapper.`;
             const overview = await fs.readFile(path.join(this.getContextPath(), 'project_overview.md'), 'utf8');
             const standards = await fs.readFile(path.join(this.getContextPath(), 'code_standards.md'), 'utf8');
             globalAnchors = `\n\n### GLOBAL PROJECT CONTEXT ARCHITECTURAL ANCHORS ###\n${overview}\n\n${standards}\n`;
-        } catch (err) {}
+        } catch {}
 
         const specContent = await fs.readFile(specFilePath, 'utf8');
 

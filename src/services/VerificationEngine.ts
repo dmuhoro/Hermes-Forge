@@ -4,6 +4,8 @@ import * as cp from 'child_process';
 import * as vscode from 'vscode';
 import { OllamaClient } from './OllamaClient';
 import { logger } from '../utils/Logger';
+import { activeSubprocesses } from '../modules/AgentEngine';
+import { ContextCrawler } from './ContextCrawler';
 
 interface ExecutionResult {
     code: number;
@@ -91,11 +93,12 @@ export class VerificationEngine {
                         if (scopeText) {
                             filesContextList.push(`--- FILE: ${relativeName} (ERROR SCOPE BLOCK: "${scopeName}" on or around line ${loc.line}) ---\n${scopeText}`);
                         } else {
-                            // Fallback to reading the full file
+                            // Fallback to reading the full file with context-safe summarization
                             const content = await fs.readFile(loc.filePath, 'utf8');
-                            filesContextList.push(`--- FILE: ${relativeName} ---\n${content}`);
+                            const summarizedContent = ContextCrawler.summarizeCode(content, 3500);
+                            filesContextList.push(`--- FILE: ${relativeName} ---\n${summarizedContent}`);
                         }
-                    } catch (err: any) {
+                    } catch {
                         logger.warn(`[VerificationEngine] Skipping unreadable error candidate: ${loc.filePath}`);
                     }
                 }
@@ -119,8 +122,9 @@ export class VerificationEngine {
                     await backupFile(p);
                     const content = await fs.readFile(p, 'utf8');
                     const relativeName = path.relative(workspacePath, p);
-                    filesContextList.push(`--- FILE: ${relativeName} ---\n${content}`);
-                } catch (err) {
+                    const summarizedContent = ContextCrawler.summarizeCode(content, 3500);
+                    filesContextList.push(`--- FILE: ${relativeName} ---\n${summarizedContent}`);
+                } catch {
                     logger.warn(`[VerificationEngine] Skipping unreadable candidate file: ${p}`);
                 }
             }
@@ -198,7 +202,11 @@ Do not write normal explanations or commentary outside the file markers.`;
      */
     private runBuildCommand(command: string, cwd: string): Promise<ExecutionResult> {
         return new Promise((resolve) => {
-            cp.exec(command, { cwd }, (error, stdout, stderr) => {
+            const childProc = cp.exec(command, { cwd }, (error, stdout, stderr) => {
+                const index = activeSubprocesses.indexOf(childProc);
+                if (index !== -1) {
+                    activeSubprocesses.splice(index, 1);
+                }
                 const code = error ? (error.code ?? 1) : 0;
                 resolve({
                     code,
@@ -206,6 +214,7 @@ Do not write normal explanations or commentary outside the file markers.`;
                     stderr: stderr || ''
                 });
             });
+            activeSubprocesses.push(childProc);
         });
     }
 

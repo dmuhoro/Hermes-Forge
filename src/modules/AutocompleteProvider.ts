@@ -1,6 +1,7 @@
 import * as vscode from 'vscode';
 import { OllamaClient } from '../services/OllamaClient';
 import { CrashShield } from '../utils/CrashShield';
+import { logger } from '../utils/Logger';
 
 export class AutocompleteProvider implements vscode.InlineCompletionItemProvider {
     private debounceTimer: NodeJS.Timeout | null = null;
@@ -98,7 +99,7 @@ export class AutocompleteProvider implements vscode.InlineCompletionItemProvider
                 } catch (error: any) {
                     disposable.dispose();
                     if (error.message !== 'Request aborted' && error.message !== 'Stream aborted') {
-                        console.error('[HermesForge] Error fetching inline completion:', error);
+                        logger.error('[HermesForge] Error fetching inline completion', error);
                     }
                     resolve(null); // Resolve to null to silently fail and allow graceful continuation
                 }

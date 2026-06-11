@@ -106,6 +106,12 @@ export const mockTextEditor = {
     selections: [new Selection(new Position(0, 0), new Position(0, 0))]
 };
 
+export enum ProgressLocation {
+    SourceControl = 1,
+    Window = 10,
+    Notification = 15
+}
+
 export const window = {
     createOutputChannel: vi.fn(() => mockOutputChannel),
     showWarningMessage: vi.fn().mockResolvedValue('Approve Run'),
@@ -120,7 +126,10 @@ export const window = {
         text: '',
         tooltip: '',
         command: ''
-    }))
+    })),
+    withProgress: vi.fn().mockImplementation(async (options: any, task: (progress: any, token: any) => Promise<any>) => {
+        return task({ report: vi.fn() }, { isCancellationRequested: false, onCancellationRequested: vi.fn() });
+    })
 };
 
 export const workspace = {
@@ -137,7 +146,22 @@ export const workspace = {
         getText: vi.fn(() => '// Mock file content\nfunction hello() {}'),
         lineCount: 15,
         uri: uri
-    }))
+    })),
+    getConfiguration: vi.fn().mockReturnValue({
+        get: vi.fn((key: string) => {
+            if (key === 'ollamaBaseUrl') return 'http://localhost:11434';
+            if (key === 'modelCompletion') return 'qwen2.5-coder:1.5b';
+            if (key === 'modelChat') return 'hermes3:8b';
+            if (key === 'contextLimits') return 1536;
+            if (key === 'safetyThreshold') return 0.8;
+            if (key === 'nodePort') return 11435;
+            if (key === 'nodeEnabled') return true;
+            if (key === 'enableCloudFallback') return false;
+            if (key === 'premiumAdvancedRAG') return false;
+            return undefined;
+        }),
+        update: vi.fn().mockResolvedValue(undefined)
+    })
 };
 
 export const commands = {

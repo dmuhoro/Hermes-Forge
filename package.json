@@ -1,9 +1,25 @@
 {
   "name": "hermes-forge",
   "displayName": "HermesForge: Executive AI Workspace",
-  "description": "Offline-first AI extension using local Ollama.",
+  "description": "Offline-first, 100% local engineering AI extension powered entirely by local Ollama.",
   "version": "1.0.0",
   "publisher": "hermesforge-studios",
+  "categories": [
+    "Programming Languages",
+    "Linters",
+    "Formatters",
+    "AI",
+    "Machine Learning"
+  ],
+  "keywords": [
+    "hermes",
+    "ollama",
+    "offline ai",
+    "local co-pilot",
+    "agent",
+    "autocomplete",
+    "typescript"
+  ],
   "repository": {
     "type": "git",
     "url": "https://github.com/dannymuhoro/hermes-forge.git"
@@ -14,16 +30,103 @@
   "activationEvents": [
     "onView:hermes-forge.chatView",
     "onView:hermes-forge.dashboardView",
-    "onCommand:hermes-forge.runAgent"
+    "onCommand:hermes-forge.runAgent",
+    "onCommand:hermes-forge.showOllamaSetup",
+    "onCommand:hermes-forge.legacyMigrate",
+    "onCommand:hermes-forge.perfAudit",
+    "onCommand:hermes-forge.benchmarkHardware",
+    "onCommand:hermes-forge.generatePrSummary",
+    "onCommand:hermes-forge.exportContext"
   ],
   "main": "./dist/extension.js",
   "contributes": {
     "commands": [
       {
         "command": "hermes-forge.runAgent",
-        "title": "HermesForge: Run Local Agent"
+        "title": "HermesForge: Run Specialized Local Agent",
+        "category": "HermesForge"
+      },
+      {
+        "command": "hermes-forge.showOllamaSetup",
+        "title": "HermesForge: Configure Connection Guide",
+        "category": "HermesForge"
+      },
+      {
+        "command": "hermes-forge.legacyMigrate",
+        "title": "HermesForge: Migrate Legacy Javascript to TypeScript",
+        "category": "HermesForge"
+      },
+      {
+        "command": "hermes-forge.perfAudit",
+        "title": "HermesForge: Identify Bottlenecks & Optimize Performance",
+        "category": "HermesForge"
+      },
+      {
+        "command": "hermes-forge.benchmarkHardware",
+        "title": "HermesForge: Run System Benchmarking Profiler",
+        "category": "HermesForge"
+      },
+      {
+        "command": "hermes-forge.generatePrSummary",
+        "title": "HermesForge: Formulate PR-Ready Differential Summary",
+        "category": "HermesForge"
+      },
+      {
+        "command": "hermes-forge.exportContext",
+        "title": "HermesForge: Export Workspace Context for External Agents",
+        "category": "HermesForge"
       }
     ],
+    "configuration": {
+      "title": "HermesForge Configuration",
+      "properties": {
+        "hermes-forge.ollamaBaseUrl": {
+          "type": "string",
+          "default": "http://localhost:11434",
+          "description": "Base URL of the local Ollama instance."
+        },
+        "hermes-forge.modelCompletion": {
+          "type": "string",
+          "default": "qwen2.5-coder:1.5b",
+          "description": "Fast, low-latency Model for Inline Code Autocomplete."
+        },
+        "hermes-forge.modelChat": {
+          "type": "string",
+          "default": "hermes3:8b",
+          "description": "High-reasoning Model for Chat, Planning, and Multi-Agentic Workspace Execution."
+        },
+        "hermes-forge.contextLimits": {
+          "type": "integer",
+          "default": 1536,
+          "description": "Maximum context length window size to load per file block (helps protect system RAM thrashing)."
+        },
+        "hermes-forge.safetyThreshold": {
+          "type": "number",
+          "default": 0.8,
+          "description": "Safety validation threshold constraints."
+        },
+        "hermes-forge.nodePort": {
+          "type": "integer",
+          "default": 11435,
+          "description": "Port on which the local Hermes-Forge & OpenClaw JSON-RPC/REST server will run."
+        },
+        "hermes-forge.nodeEnabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable the local background HTTP server for external agent protocols and tools routing."
+        },
+        "hermes-forge.enableCloudFallback": {
+          "type": "boolean",
+          "default": false,
+          "description": "Premium: Opt-in cloud model fallback if the local system encounters hardware limits or processing failures."
+        },
+        "hermes-forge.premiumAdvancedRAG": {
+          "type": "boolean",
+          "default": false,
+          "description": "Premium: Enables advanced recursive semantic retrieval (RAG) vector embeddings across the active workspace directory."
+        }
+      }
+    },
     "viewsContainers": {
       "activitybar": [
         {
@@ -49,28 +152,28 @@
     }
   },
   "scripts": {
-  "start": "npm run dev",
-  "vscode:prepublish": "npm run build",
-  "build": "esbuild src/extension.ts --bundle --outfile=dist/extension.js --external:vscode --format=cjs --platform=node",
-  "watch": "esbuild src/extension.ts --bundle --outfile=dist/extension.js --external:vscode --format=cjs --platform=node --watch",
-  "dev": "node -e \"require('http').createServer((req,res)=>{res.writeHead(200,{'Content-Type':'text/plain'});res.end('VS Code Extension Workspace Ready.');}).listen(3000,()=>console.log('Dummy server running on 3000'));\"",
-  "lint": "eslint src --ext .ts && tsc --noEmit",
-  "lint:fix": "eslint src --ext .ts --fix",
-  "test": "vitest run",
-  "test:watch": "vitest watch",
-  "test:integration": "vitest run src/__tests__/integration",
-  "build:prod": "tsc -p ./ && vsce package",
-  "version:patch": "vsce version patch"
-},
-"devDependencies": {
-  "@types/node": "^22.14.0",
-  "@types/vscode": "^1.80.0",
-  "@typescript-eslint/eslint-plugin": "^8.61.0",
-  "@typescript-eslint/parser": "^8.61.0",
-  "esbuild": "^0.25.0",
-  "eslint": "^10.4.1",
-  "typescript": "~5.8.2",
-  "vitest": "^4.1.8"
-}
-  
+    "start": "npm run dev",
+    "vscode:prepublish": "npm run build",
+    "build": "esbuild src/extension.ts --bundle --outfile=dist/extension.js --external:vscode --format=cjs --platform=node",
+    "watch": "esbuild src/extension.ts --bundle --outfile=dist/extension.js --external:vscode --format=cjs --platform=node --watch",
+    "dev": "node -e \"require('http').createServer((req,res)=>{res.writeHead(200,{'Content-Type':'text/plain'});res.end('VS Code Extension Workspace Ready.');}).listen(3000,()=>console.log('Dummy server running on 3000'));\"",
+    "lint": "eslint src --ext .ts && tsc --noEmit",
+    "lint:fix": "eslint src --ext .ts --fix",
+    "test": "vitest run",
+    "test:watch": "vitest watch",
+    "test:integration": "vitest run src/__tests__/integration",
+    "build:prod": "npm run build && vsce package",
+    "version:patch": "vsce version patch"
+  },
+  "devDependencies": {
+    "@types/node": "^22.14.0",
+    "@types/vscode": "^1.80.0",
+    "@typescript-eslint/eslint-plugin": "^8.61.0",
+    "@typescript-eslint/parser": "^8.61.0",
+    "@vscode/vsce": "^3.9.2",
+    "esbuild": "^0.25.0",
+    "eslint": "^10.4.1",
+    "typescript": "~5.8.2",
+    "vitest": "^4.1.8"
+  }
 }

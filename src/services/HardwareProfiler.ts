@@ -105,4 +105,42 @@ export class HardwareProfiler {
         this.lastCheckTime = now;
         return this.isOfflineCache;
     }
+
+    /**
+     * Executes an active inference speed test against the local Ollama instance
+     * to measure Time-To-First-Token (TTFT) and Tokens-Per-Second (TPS) latency statistics.
+     */
+    public static async runSpeedTest(ollama: any): Promise<{ tps: number; ttft: number; totalTokens: number; durationMs: number }> {
+        const startTime = Date.now();
+        let firstTokenTime = 0;
+        let tokenCount = 0;
+        
+        try {
+            // High-fidelity standard prompt optimized for quick 30-50 tokens response
+            const prompt = 'Explain TypeScript interfaces in exactly three short sentences.';
+            const stream = ollama.streamCompletion(prompt, { temperature: 0.1 });
+            
+            for await (const chunk of stream) {
+                if (tokenCount === 0) {
+                    firstTokenTime = Date.now();
+                }
+                // Approximate token metrics from space-delimited text chunks
+                const words = chunk.split(/\s+/).filter(Boolean).length;
+                tokenCount += words > 0 ? words : 1;
+            }
+            
+            const totalTimeMs = Date.now() - startTime;
+            const ttft = firstTokenTime ? (firstTokenTime - startTime) : totalTimeMs;
+            const tps = tokenCount / ((totalTimeMs - ttft) / 1000 || 1);
+            
+            return {
+                tps: parseFloat(tps.toFixed(1)),
+                ttft,
+                totalTokens: tokenCount,
+                durationMs: totalTimeMs
+            };
+        } catch (err: any) {
+            throw new Error(`Hardware speed test failed: ${err.message}`);
+        }
+    }
 }

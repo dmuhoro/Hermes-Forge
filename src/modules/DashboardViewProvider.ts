@@ -1,4 +1,6 @@
 import * as vscode from 'vscode';
+import * as fs from 'fs/promises';
+import * as path from 'path';
 import { OllamaClient } from '../services/OllamaClient';
 import { ExecutiveOrchestrator } from '../services/ExecutiveOrchestrator';
 import { logger } from '../utils/Logger';
@@ -11,6 +13,12 @@ export class DashboardViewProvider implements vscode.WebviewViewProvider {
         private readonly _extensionUri: vscode.Uri,
         private readonly ollama: OllamaClient
     ) {}
+
+    public postMessage(message: any): void {
+        if (this._view) {
+            this._view.webview.postMessage(message);
+        }
+    }
 
     public resolveWebviewView(
         webviewView: vscode.WebviewView,
@@ -26,9 +34,97 @@ export class DashboardViewProvider implements vscode.WebviewViewProvider {
 
         webviewView.webview.html = this._getHtmlForWebview();
 
+        const sendConfigUpdate = () => {
+            if (this._view) {
+                const config = vscode.workspace.getConfiguration('hermes-forge');
+                this._view.webview.postMessage({
+                    type: 'configUpdate',
+                    enableCloudFallback: !!config.get<boolean>('enableCloudFallback'),
+                    premiumAdvancedRAG: !!config.get<boolean>('premiumAdvancedRAG'),
+                    nodePort: config.get<number>('nodePort') || 11435,
+                    nodeEnabled: config.get<boolean>('nodeEnabled') !== false
+                });
+            }
+        };
+
+        const unsubscribe = this.ollama.onStatusChange((status) => {
+            if (this._view) {
+                this._view.webview.postMessage({
+                    type: 'connectionStatus',
+                    status,
+                    modelCompletion: this.ollama.modelCompletion,
+                    modelChat: this.ollama.modelChat
+                });
+                sendConfigUpdate();
+            }
+        });
+
+        const configDisposable = vscode.workspace.onDidChangeConfiguration((e) => {
+            if (e.affectsConfiguration('hermes-forge')) {
+                sendConfigUpdate();
+            }
+        });
+
+        webviewView.onDidDispose(() => {
+            unsubscribe();
+            configDisposable.dispose();
+        });
+
+        // Push initial configs after 800ms to allow webview hydration
+        setTimeout(sendConfigUpdate, 800);
+
         webviewView.webview.onDidReceiveMessage(async (data) => {
             if (data.type === 'startPipeline') {
                 await this.handlePipelineTrigger(data.value);
+            } else if (data.type === 'retryConnection') {
+                const connected = await this.ollama.checkConnection();
+                if (connected) {
+                    vscode.window.showInformationMessage('🟢 Connection successful! Ollama is now online.');
+                } else {
+                    vscode.window.showErrorMessage('🔴 Could not connect. Ensure Ollama service is active.');
+                }
+            } else if (data.type === 'runSetupGuide') {
+                vscode.commands.executeCommand('hermes-forge.showOllamaSetup');
+            } else if (data.type === 'triggerBenchmark') {
+                vscode.commands.executeCommand('hermes-forge.benchmarkHardware');
+            } else if (data.type === 'triggerMigration') {
+                vscode.commands.executeCommand('hermes-forge.legacyMigrate');
+            } else if (data.type === 'triggerAudit') {
+                vscode.commands.executeCommand('hermes-forge.perfAudit');
+            } else if (data.type === 'triggerPrSummary') {
+                vscode.commands.executeCommand('hermes-forge.generatePrSummary');
+            } else if (data.type === 'submitFeedback') {
+                const feedbackText = data.feedback;
+                if (feedbackText && feedbackText.trim()) {
+                    try {
+                        const folders = vscode.workspace.workspaceFolders;
+                        const root = folders && folders.length > 0 ? folders[0].uri.fsPath : process.cwd();
+                        const telemetryDir = path.join(root, '.telemetry');
+                        await fs.mkdir(telemetryDir, { recursive: true });
+                        const feedbackFile = path.join(telemetryDir, 'feedback.json');
+                        let currentFeedbacks: any[] = [];
+                        try {
+                            const raw = await fs.readFile(feedbackFile, 'utf8');
+                            currentFeedbacks = JSON.parse(raw);
+                        } catch {}
+                        currentFeedbacks.push({
+                            timestamp: new Date().toISOString(),
+                            feedback: feedbackText,
+                            licenseTier: 'Individual Offline Sandbox'
+                        });
+                        await fs.writeFile(feedbackFile, JSON.stringify(currentFeedbacks, null, 2), 'utf8');
+                        vscode.window.showInformationMessage('🟢 Thank you! Your feedback has been recorded safely in your local telemetry database.');
+                    } catch (err: any) {
+                        vscode.window.showErrorMessage(`Failed to record feedback offline: ${err.message}`);
+                    }
+                }
+            } else if (data.type === 'togglePremiumFlag') {
+                const config = vscode.workspace.getConfiguration('hermes-forge');
+                const flag = data.flag; // 'enableCloudFallback' | 'premiumAdvancedRAG'
+                const current = !!config.get<boolean>(flag);
+                await config.update(flag, !current, vscode.ConfigurationTarget.Global);
+                vscode.window.showInformationMessage(`Premium Setting Saved: ${flag} is now ${!current ? 'ENABLED' : 'DISABLED'}`);
+                sendConfigUpdate();
             }
         });
     }
@@ -409,15 +505,69 @@ export class DashboardViewProvider implements vscode.WebviewViewProvider {
             white-space: pre-wrap;
             display: none;
         }
+
+        /* Bento Grid Style for Advanced Fast Tools */
+        .bento-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
+            margin-top: 6px;
+        }
+        .bento-card {
+            background-color: var(--dark-surface);
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            padding: 10px;
+            cursor: pointer;
+            text-align: left;
+            transition: all 0.2s ease;
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+        }
+        .bento-card:hover {
+            border-color: var(--cool-blue);
+            background-color: rgba(0, 210, 255, 0.05);
+            box-shadow: 0 0 6px rgba(0, 210, 255, 0.15);
+        }
+        .bento-title {
+            font-family: var(--font-mono);
+            font-size: 10px;
+            font-weight: bold;
+            color: var(--cool-blue);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        .bento-desc {
+            font-size: 9px;
+            opacity: 0.7;
+            line-height: 1.3;
+        }
+        .toggle-container {
+            border: 1px solid var(--border-color);
+            background: rgba(255, 0, 127, 0.1);
+            color: var(--neon-pink);
+            transition: all 0.2s ease;
+            padding: 2px 8px;
+            border-radius: 2px;
+            font-family: var(--font-mono);
+            font-size: 9px;
+            font-weight: bold;
+        }
+        .toggle-container.active {
+            background: rgba(0, 255, 170, 0.1);
+            color: var(--neon-mint);
+            border-color: var(--neon-mint);
+        }
     </style>
 </head>
 <body>
 
     <div class="header">
         <h1>HermesForge Core</h1>
-        <div class="pulse-badge">
-            <div class="pulse-dot"></div>
-            <span>ONLINE</span>
+        <div class="pulse-badge" id="setup-pulse-badge" style="cursor: pointer;" title="Click for guided local configuration">
+            <div id="connection-pulse-dot" class="pulse-dot"></div>
+            <span id="connection-pulse-text">CONNECTING</span>
         </div>
     </div>
 
@@ -466,6 +616,29 @@ export class DashboardViewProvider implements vscode.WebviewViewProvider {
         </div>
     </div>
 
+    <!-- Advanced Fast Actions Bento Grid -->
+    <div class="matrix-container" style="margin-top: 4px;">
+        <div class="section-title">Specialized AI Missions</div>
+        <div class="bento-grid">
+            <div class="bento-card" id="btn-legacy-migrate" title="Click to modernize your active legacy JavaScript document to clean TypeScript.">
+                <span class="bento-title">🔄 JS to TS Migrator</span>
+                <span class="bento-desc">Type declarations, exports and unit tests drafts.</span>
+            </div>
+            <div class="bento-card" id="btn-perf-audit" title="Click to perform a logical Big-O bottleneck analysis in your output window.">
+                <span class="bento-title">⚡️ Bottleneck Auditor</span>
+                <span class="bento-desc">Algorithmic complexity, leak scoring and latency saves.</span>
+            </div>
+            <div class="bento-card" id="btn-benchmark" title="Click to run system profile benchmark for model word processing speed (TPS).">
+                <span class="bento-title">🧪 HW Speed Benchmark</span>
+                <span class="bento-desc">Latency, processor speed and model profiles.</span>
+            </div>
+            <div class="bento-card" id="btn-pr-summary" title="Click to outline clean PR description logs and changelog commits from git diffs.">
+                <span class="bento-title">📦 Git PR Builder</span>
+                <span class="bento-desc">Conventional commit, changelog entry and rollback checks.</span>
+            </div>
+        </div>
+    </div>
+
     <!-- Interactive Terminal Command Area -->
     <div class="terminal-container">
         <div class="section-title">Mission Control Terminal</div>
@@ -484,8 +657,71 @@ export class DashboardViewProvider implements vscode.WebviewViewProvider {
         <div id="terminal-log" class="terminal-log"></div>
     </div>
 
+    <!-- Hardware Benchmark Visualizer -->
+    <div class="matrix-container" id="benchmark-insights-panel" style="margin-top: 12px; display: none;">
+        <div class="section-title">⚡️ Hardware Benchmark Device Profile</div>
+        <div style="background: rgba(16, 21, 30, 0.7); border: 1px solid var(--border-color); border-radius: 4px; padding: 12px; display: flex; flex-direction: column; gap: 8px;">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+                <span style="font-size: 11px; opacity: 0.8;">Inference Speed:</span>
+                <span id="bench-speed-val" style="font-family: var(--font-mono); font-size: 14px; font-weight: bold; color: var(--neon-mint);">0.0 words/sec</span>
+            </div>
+            <!-- Progress representation bar -->
+            <div style="width: 100%; height: 6px; background: #0c0f13; border-radius: 3px; overflow: hidden; border: 1px solid var(--border-color);">
+                <div id="bench-speed-bar" style="width: 0%; height: 100%; background: linear-gradient(90deg, var(--cool-blue), var(--neon-mint)); transition: width 0.5s ease-out;"></div>
+            </div>
+            <div style="display: flex; gap: 10px; justify-content: space-between; margin-top: 4px; font-size: 9px; opacity: 0.7; border-top: 1px solid var(--border-color); padding-top: 6px;">
+                <div>TTFT Latency: <span id="bench-ttft" style="color: var(--cool-blue); font-family: var(--font-mono);">0ms</span></div>
+                <div>RAM: <span id="bench-ram" style="color: var(--cool-blue); font-family: var(--font-mono);">0GB</span></div>
+                <div>Threads: <span id="bench-threads" style="color: var(--cool-blue); font-family: var(--font-mono);">0</span></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Monetization & Premium Panel -->
+    <div class="matrix-container" style="margin-top: 12px;">
+        <div class="section-title">💎 License & Premium Options</div>
+        <div style="background: rgba(16, 21, 30, 0.7); border: 1px solid var(--border-color); border-radius: 4px; padding: 12px; display: flex; flex-direction: column; gap: 10px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; font-size: 11px;">
+                <span>Cloud Fallback Model (Opt-in)</span>
+                <div class="toggle-container" id="toggle-cloud" style="cursor: pointer;">OFF</div>
+            </div>
+            <div style="display: flex; justify-content: space-between; align-items: center; font-size: 11px;">
+                <span>Advanced Semantic RAG</span>
+                <div class="toggle-container" id="toggle-rag" style="cursor: pointer;">OFF</div>
+            </div>
+            <div style="display: flex; justify-content: space-between; align-items: center; font-size: 10px; border-top: 1px solid var(--border-color); padding-top: 8px; opacity: 0.8;">
+                <span>Hermes-Forge Local Server Node</span>
+                <span id="bridge-server-port" style="font-family: var(--font-mono); color: var(--neon-mint); font-weight: bold;">OFFLINE</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Offline Telemetry Feedback Widget -->
+    <div class="matrix-container" style="margin-top: 12px; margin-bottom: 12px;">
+        <div class="section-title">💬 Offline Community Feedback</div>
+        <div style="background: rgba(16, 21, 30, 0.7); border: 1px solid var(--border-color); border-radius: 4px; padding: 12px; display: flex; flex-direction: column; gap: 8px;">
+            <div style="font-size: 9px; opacity: 0.7; line-height: 1.4;">Submit feature thoughts offline. It writes safely to <code>.telemetry/feedback.json</code> inside this workspace.</div>
+            <textarea id="feedback-text" style="width: 100%; height: 45px; background: #0c0f13; border: 1px solid var(--border-color); border-radius: 2px; color: var(--text-color); font-family: var(--font-family); font-size: 10px; padding: 6px; resize: none;" placeholder="Provide feedback or report local issues here..."></textarea>
+            <button id="feedback-btn" style="width: 100%; background: var(--border-color); border: 1px solid var(--border-color); color: rgb(200, 200, 200); cursor: pointer; padding: 6px; border-radius: 2px; font-size: 10px; font-family: var(--font-mono); text-transform: uppercase;">Submit Message</button>
+        </div>
+    </div>
+
     <script>
         const vscode = acquireVsCodeApi();
+
+        // Bento buttons event listeners
+        document.getElementById('btn-legacy-migrate').addEventListener('click', () => {
+            vscode.postMessage({ type: 'triggerMigration' });
+        });
+        document.getElementById('btn-perf-audit').addEventListener('click', () => {
+            vscode.postMessage({ type: 'triggerAudit' });
+        });
+        document.getElementById('btn-benchmark').addEventListener('click', () => {
+            vscode.postMessage({ type: 'triggerBenchmark' });
+        });
+        document.getElementById('btn-pr-summary').addEventListener('click', () => {
+            vscode.postMessage({ type: 'triggerPrSummary' });
+        });
         
         const launchBtn = document.getElementById('launch-btn');
         const inputArea = document.getElementById('intent-input');
@@ -540,6 +776,13 @@ export class DashboardViewProvider implements vscode.WebviewViewProvider {
             }
         });
 
+        const pulseBadge = document.getElementById('setup-pulse-badge');
+        pulseBadge.addEventListener('click', () => {
+            vscode.postMessage({ type: 'runSetupGuide' });
+        });
+
+        let ollamaOnline = false;
+
         window.addEventListener('message', event => {
             const msg = event.data;
             
@@ -566,9 +809,9 @@ export class DashboardViewProvider implements vscode.WebviewViewProvider {
                 }
             } 
             else if (msg.type === 'pipelineEnd') {
-                launchBtn.disabled = false;
-                inputArea.disabled = false;
-                launchBtn.textContent = 'LNC_STARTUP_PIPELINE';
+                launchBtn.disabled = !ollamaOnline;
+                inputArea.disabled = !ollamaOnline;
+                launchBtn.textContent = ollamaOnline ? 'LNC_STARTUP_PIPELINE' : 'OLLAMA OFFLINE';
                 pipelineStatus.style.display = 'block';
                 
                 if (msg.success) {
@@ -580,6 +823,122 @@ export class DashboardViewProvider implements vscode.WebviewViewProvider {
                     pipelineStatus.style.color = 'var(--neon-pink)';
                     appendLog(\`[SYSTEM] Epic fail: \${msg.error || 'Unknown core orchestrator interrupt'}\`);
                 }
+            }
+            else if (msg.type === 'connectionStatus') {
+                const status = msg.status;
+                const pulseDot = document.getElementById('connection-pulse-dot');
+                const pulseText = document.getElementById('connection-pulse-text');
+                
+                if (!status.connected) {
+                    ollamaOnline = false;
+                    pulseDot.style.backgroundColor = 'var(--neon-pink)';
+                    pulseDot.style.boxShadow = '0 0 8px var(--neon-pink)';
+                    pulseText.textContent = 'OFFLINE';
+                    pulseText.style.color = 'var(--neon-pink)';
+                    launchBtn.disabled = true;
+                    launchBtn.textContent = 'OLLAMA OFFLINE';
+                } else if (!status.completionModelExists || !status.chatModelExists) {
+                    ollamaOnline = false;
+                    pulseDot.style.backgroundColor = 'var(--neon-orange)';
+                    pulseDot.style.boxShadow = '0 0 8px var(--neon-orange)';
+                    pulseText.textContent = 'PULL_MODELS';
+                    pulseText.style.color = 'var(--neon-orange)';
+                    launchBtn.disabled = true;
+                    launchBtn.textContent = 'MODELS MISSING';
+                } else {
+                    ollamaOnline = true;
+                    pulseDot.style.backgroundColor = 'var(--neon-mint)';
+                    pulseDot.style.boxShadow = '0 0 8px var(--neon-mint)';
+                    pulseText.textContent = 'ONLINE';
+                    pulseText.style.color = 'var(--neon-mint)';
+                    
+                    if (launchBtn.textContent === 'OLLAMA OFFLINE' || launchBtn.textContent === 'MODELS MISSING') {
+                        launchBtn.disabled = false;
+                        inputArea.disabled = false;
+                        launchBtn.textContent = 'LNC_STARTUP_PIPELINE';
+                    }
+                }
+            }
+            else if (msg.type === 'configUpdate') {
+                const cloudActive = !!msg.enableCloudFallback;
+                const ragActive = !!msg.premiumAdvancedRAG;
+
+                const toggleCloud = document.getElementById('toggle-cloud');
+                const toggleRag = document.getElementById('toggle-rag');
+
+                if (cloudActive) {
+                    toggleCloud.className = 'toggle-container active';
+                    toggleCloud.textContent = 'ON';
+                } else {
+                    toggleCloud.className = 'toggle-container';
+                    toggleCloud.textContent = 'OFF';
+                }
+
+                if (ragActive) {
+                    toggleRag.className = 'toggle-container active';
+                    toggleRag.textContent = 'ON';
+                } else {
+                    toggleRag.className = 'toggle-container';
+                    toggleRag.textContent = 'OFF';
+                }
+
+                const serverPortSpan = document.getElementById('bridge-server-port');
+                if (serverPortSpan) {
+                    if (msg.nodeEnabled) {
+                        serverPortSpan.textContent = 'LISTENING : ' + msg.nodePort;
+                        serverPortSpan.style.color = 'var(--neon-mint)';
+                    } else {
+                        serverPortSpan.textContent = 'DISABLED';
+                        serverPortSpan.style.color = 'var(--neon-pink)';
+                    }
+                }
+            }
+            else if (msg.type === 'benchmarkResult') {
+                const bInsights = document.getElementById('benchmark-insights-panel');
+                const bSpeedVal = document.getElementById('bench-speed-val');
+                const bSpeedBar = document.getElementById('bench-speed-bar');
+                const bTtft = document.getElementById('bench-ttft');
+                const bRam = document.getElementById('bench-ram');
+                const bThreads = document.getElementById('bench-threads');
+
+                if (bInsights) {
+                    bInsights.style.display = 'block';
+                    bSpeedVal.textContent = msg.stats.tps.toFixed(1) + ' words/sec';
+                    bTtft.textContent = msg.stats.ttft + 'ms';
+                    bRam.textContent = msg.config.totalMemoryGB + 'GB';
+                    bThreads.textContent = msg.config.threads;
+
+                    // Gauge calculation: 30 words/sec is 100% capacity in offline contexts
+                    const pct = Math.min(100, Math.max(5, (msg.stats.tps / 30) * 100));
+                    bSpeedBar.style.width = pct + '%';
+                }
+            }
+        });
+
+        // Toggle settings event listeners
+        document.getElementById('toggle-cloud').addEventListener('click', () => {
+            vscode.postMessage({ type: 'togglePremiumFlag', flag: 'enableCloudFallback' });
+        });
+
+        document.getElementById('toggle-rag').addEventListener('click', () => {
+            vscode.postMessage({ type: 'togglePremiumFlag', flag: 'premiumAdvancedRAG' });
+        });
+
+        // Offline feedback submit events
+        const feedbackBtn = document.getElementById('feedback-btn');
+        const feedbackText = document.getElementById('feedback-text');
+
+        feedbackBtn.addEventListener('click', () => {
+            const feed = feedbackText.value.trim();
+            if (feed) {
+                vscode.postMessage({ type: 'submitFeedback', feedback: feed });
+                feedbackText.value = '';
+                feedbackBtn.textContent = 'LOGGED SECURELY!';
+                feedbackBtn.style.color = 'var(--neon-mint)';
+                setTimeout(() => {
+                    feedbackBtn.textContent = 'Submit Message';
+                    feedbackBtn.style.color = 'rgb(200,200,200)';
+                }, 2000);
             }
         });
     </script>

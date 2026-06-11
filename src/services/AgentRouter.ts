@@ -20,6 +20,19 @@ export class AgentRouter {
     public async routeTask(userPrompt: string, fileContext: string): Promise<void> {
         const stopTimer = logger.startTimer('AgentRouter Decision Pipeline');
         
+        // Check for static command interception: analyze or /analyze
+        const trimmedPrompt = userPrompt.trim().toLowerCase();
+        if (trimmedPrompt.includes('analyze this repository') || trimmedPrompt === '/analyze') {
+            this.chatProvider.sendSystemNotification('🔍 **Analyzer**: Scanning and profiling codebase architecture...');
+            const folders = vscode.workspace.workspaceFolders;
+            const root = folders && folders.length > 0 ? folders[0].uri.fsPath : process.cwd();
+            const crawler = new ContextCrawler();
+            const report = await crawler.analyzeRepository(root);
+            await this.chatProvider.streamResponseDirectly(report);
+            stopTimer();
+            return;
+        }
+
         let category = TaskCategory.EXPLAIN_OR_AUDIT;
 
         // 1. Ultra-fast cheap token-pass to classify the user's intent using Qwen-1.5B
@@ -62,16 +75,25 @@ USER PROMPT: ${userPrompt}`;
         });
         stopTimer();
 
-        // 2. Sprint 4: Agentic File-Tree RAG Generation
+        // 2. Sprint 3: Advanced Smart Offline RAG Context Injection
         const activeEditor = vscode.window.activeTextEditor;
         let enhancedContext = fileContext;
         
-        if (activeEditor && activeEditor.document.fileName) {
+        try {
+            const folders = vscode.workspace.workspaceFolders;
+            const root = folders && folders.length > 0 ? folders[0].uri.fsPath : process.cwd();
             const crawler = new ContextCrawler();
-            const extendedDependencies = await crawler.getExpandedContext(activeEditor.document.fileName);
-            if (extendedDependencies) {
-                enhancedContext += `\n\n### Expanded Workspace RAG Context ###\n${extendedDependencies}`;
+            const smartContext = await crawler.getSmartContext(root, userPrompt, 5);
+            if (smartContext) {
+                enhancedContext += smartContext;
+            } else if (activeEditor && activeEditor.document.fileName) {
+                const extendedDependencies = await crawler.getExpandedContext(activeEditor.document.fileName);
+                if (extendedDependencies) {
+                    enhancedContext += `\n\n### Expanded Workspace Context ###\n${extendedDependencies}`;
+                }
             }
+        } catch (err: any) {
+            logger.warn(`[AgentRouter] Smart context injection encountered issue: ${err.message}`);
         }
 
         // 3. Dispatch Execution Based on Classification

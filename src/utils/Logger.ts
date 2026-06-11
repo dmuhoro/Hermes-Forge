@@ -36,7 +36,7 @@ export class OfflineLogger {
         if (meta) {
             try {
                 metaStr = ` | Meta: ${JSON.stringify(meta)}`;
-            } catch (e) {
+            } catch {
                 metaStr = ' | [Unserializable Meta]';
             }
         }

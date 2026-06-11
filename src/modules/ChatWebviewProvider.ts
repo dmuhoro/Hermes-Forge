@@ -27,9 +27,33 @@ export class ChatWebviewProvider implements vscode.WebviewViewProvider {
 
         webviewView.webview.html = this._getHtmlForWebview();
 
+        const unsubscribe = this.ollama.onStatusChange((status) => {
+            if (this._view) {
+                this._view.webview.postMessage({
+                    type: 'connectionStatus',
+                    status,
+                    modelCompletion: this.ollama.modelCompletion,
+                    modelChat: this.ollama.modelChat
+                });
+            }
+        });
+
+        webviewView.onDidDispose(() => {
+            unsubscribe();
+        });
+
         webviewView.webview.onDidReceiveMessage(async (data) => {
             if (data.type === 'sendPrompt') {
                 await this.handleChatInteraction(data.value);
+            } else if (data.type === 'retryConnection') {
+                const connected = await this.ollama.checkConnection();
+                if (connected) {
+                    vscode.window.showInformationMessage('🟢 Connection successful! Ollama is now online.');
+                } else {
+                    vscode.window.showErrorMessage('🔴 Could not connect. Ensure the Ollama port (11434) is accessible.');
+                }
+            } else if (data.type === 'runSetupGuide') {
+                vscode.commands.executeCommand('hermes-forge.showOllamaSetup');
             }
         });
     }
@@ -96,6 +120,21 @@ export class ChatWebviewProvider implements vscode.WebviewViewProvider {
         } catch (error: any) {
             this._view.webview.postMessage({ type: 'error', value: error.message || 'Error communicating with Ollama' });
             logger.error('[HermesForge] Chat Stream Error:', error);
+        }
+    }
+
+    public async streamResponseDirectly(text: string) {
+        if (!this._view) return;
+        this._view.webview.postMessage({ type: 'startStream' });
+        const chunks = text.match(/.{1,15}/g) || [text];
+        for (const chunk of chunks) {
+            if (this._view) {
+                this._view.webview.postMessage({ type: 'streamChunk', value: chunk });
+            }
+            await new Promise(r => setTimeout(r, 10));
+        }
+        if (this._view) {
+            this._view.webview.postMessage({ type: 'endStream' });
         }
     }
 
@@ -272,9 +311,79 @@ export class ChatWebviewProvider implements vscode.WebviewViewProvider {
                     to { transform: rotate(360deg); }
                 }
 
+                #connection-warning {
+                    display: none;
+                    background: rgba(220, 50, 50, 0.08);
+                    border: 1px solid var(--vscode-errorForeground, #f48771);
+                    border-radius: 4px;
+                    padding: 12px;
+                    margin: 12px;
+                    font-size: 12px;
+                    flex-direction: column;
+                    gap: 8px;
+                }
+                #connection-warning h3 {
+                    margin: 0;
+                    color: var(--vscode-errorForeground, #f48771);
+                    font-size: 13px;
+                    text-transform: uppercase;
+                    font-weight: bold;
+                }
+                #connection-warning p {
+                    margin: 0;
+                    line-height: 1.4;
+                    opacity: 0.9;
+                }
+                #connection-warning code {
+                    background: rgba(0, 0, 0, 0.4);
+                    padding: 2px 5px;
+                    border-radius: 3px;
+                    font-family: var(--vscode-editor-font-family, monospace);
+                    font-size: 11px;
+                }
+                .warning-btn-container {
+                    display: flex;
+                    gap: 8px;
+                    margin-top: 4px;
+                }
+                .warning-btn {
+                    background: var(--button-bg);
+                    color: #fff;
+                    border: none;
+                    border-radius: 2px;
+                    padding: 5px 10px;
+                    cursor: pointer;
+                    font-size: 11px;
+                    font-weight: 500;
+                    text-transform: uppercase;
+                }
+                .warning-btn:hover {
+                    background: var(--button-hover);
+                }
+                .warning-secondary-btn {
+                    background: transparent;
+                    border: 1px solid var(--border-color);
+                    color: var(--text-color);
+                    border-radius: 2px;
+                    padding: 4px 8px;
+                    cursor: pointer;
+                    font-size: 11px;
+                }
+                .warning-secondary-btn:hover {
+                    background: rgba(255, 255, 255, 0.05);
+                }
+
             </style>
         </head>
         <body>
+            <div id="connection-warning">
+                <h3 id="warning-title">Ollama Offline</h3>
+                <p id="warning-text">Failed to connect to local Ollama. Please make sure the service is started.</p>
+                <div class="warning-btn-container">
+                    <button class="warning-btn" id="warning-action-btn">Launch Setup Guide</button>
+                    <button class="warning-secondary-btn" id="warning-retry-btn">Retry</button>
+                </div>
+            </div>
             <div id="chat-container">
                 <div class="message">
                     <div class="message-role ai-role">HermesForge</div>
@@ -397,6 +506,17 @@ export class ChatWebviewProvider implements vscode.WebviewViewProvider {
                 // Temporary buffer to handle streaming formatted markdown correctly when complete
                 let rawStreamContent = "";
 
+                const warnActionBtn = document.getElementById('warning-action-btn');
+                const warnRetryBtn = document.getElementById('warning-retry-btn');
+                
+                warnActionBtn.addEventListener('click', () => {
+                    vscode.postMessage({ type: 'runSetupGuide' });
+                });
+                
+                warnRetryBtn.addEventListener('click', () => {
+                    vscode.postMessage({ type: 'retryConnection' });
+                });
+
                 window.addEventListener('message', event => {
                     const msg = event.data;
                     
@@ -433,6 +553,40 @@ export class ChatWebviewProvider implements vscode.WebviewViewProvider {
                             currentAiContent.innerHTML = '<span style="color:red">Error: ' + escapeHtml(msg.value) + '</span>';
                         }
                         scrollToBottom();
+                    } else if (msg.type === 'connectionStatus') {
+                        const status = msg.status;
+                        const warnDiv = document.getElementById('connection-warning');
+                        const warnTitle = document.getElementById('warning-title');
+                        const warnText = document.getElementById('warning-text');
+                        
+                        if (!status.connected) {
+                            warnTitle.textContent = 'Ollama Service Offline';
+                            warnText.innerHTML = 'Cannot ping local Ollama at <code>' + escapeHtml(msg.status.baseUrl || 'http://localhost:11434') + '</code>.<br><br>Make sure Ollama is installed and running: run <code>ollama serve</code>.';
+                            warnActionBtn.textContent = 'Launch Setup Guide';
+                            warnDiv.style.display = 'flex';
+                            sendBtn.disabled = true;
+                            promptInput.disabled = true;
+                        } else if (!status.completionModelExists || !status.chatModelExists) {
+                            warnTitle.textContent = 'Ollama Models Missing';
+                            const missing = [];
+                            if (!status.completionModelExists) missing.push(msg.modelCompletion);
+                            if (!status.chatModelExists) missing.push(msg.modelChat);
+                            
+                            warnText.innerHTML = 'Ollama connected, but missing required models. Please run:<br>' + 
+                                missing.map(m => '<code>ollama pull ' + escapeHtml(m) + '</code>').join('<br>') + 
+                                '<br><br>Click below to copy pull commands or trigger configuration.';
+                            
+                            warnActionBtn.textContent = 'Configure Models';
+                            warnDiv.style.display = 'flex';
+                            sendBtn.disabled = true;
+                            promptInput.disabled = true;
+                        } else {
+                            warnDiv.style.display = 'none';
+                            if (!isGenerating) {
+                                sendBtn.disabled = false;
+                                promptInput.disabled = false;
+                            }
+                        }
                     }
                 });
             </script>
