@@ -12,7 +12,10 @@
       "label": "Test After Build",
       "type": "shell",
       "command": "npm run build && npm test",
-      "group": { "kind": "test", "isDefault": true },
+      "group": {
+        "kind": "test",
+        "isDefault": true
+      },
       "problemMatcher": []
     }
   ]
