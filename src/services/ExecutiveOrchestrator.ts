@@ -87,8 +87,8 @@ Respond with ONLY the Markdown content. Do not write explanations or conversatio
         } catch (error) {
             logger.warn('[ExecutiveOrchestrator] Local model was unavailable during Chief Architect drafting. Emitting high-tier static defaults.', error);
             overview = `# Project Overview\n\n**Intent:** ${userIntent}\n\n## Vision\nRobust decoupled implementation centered on high standards.`;
-            architecture = `# Architecture Context\n\n## Directory Strategy\nModular sub-structures aligned for strict type verification.`;
-            standards = `# Code Standards\n\n## Guidelines\n- Strict compile-time checks with zero any statements.\n- Explicit interface schemas and structured naming models.`;
+            architecture = '# Architecture Context\n\n## Directory Strategy\nModular sub-structures aligned for strict type verification.';
+            standards = '# Code Standards\n\n## Guidelines\n- Strict compile-time checks with zero any statements.\n- Explicit interface schemas and structured naming models.';
         }
 
         const progressTracker = `# Progress Tracker\n\n| Phase | Task | Specification | Status | Updated |\n| :--- | :--- | :--- | :--- | :--- |\n| Architect | Initial Project Mapping | N/A | **Completed** | ${new Date().toISOString()} |\n`;
@@ -279,7 +279,7 @@ Do not include any other conversations.`;
         pipelineTimer();
 
         if (success) {
-            vscode.window.showInformationMessage(`HermesForge [Success]: Executive pipeline executed successfully. Core files designed and written!`);
+            vscode.window.showInformationMessage('HermesForge [Success]: Executive pipeline executed successfully. Core files designed and written!');
         } else {
             vscode.window.showWarningMessage(`HermesForge [Partial Success]: Executed pipeline, but failed to compile perfectly without QA alerts after ${maxRefinements} self-healing attempts.`);
         }
@@ -335,11 +335,11 @@ Respond ONLY with the complete Markdown file contents. No chat conversational fi
             // Elegant strict design-defending fallbacks
             overview = `# Project Overview\n\n**Initial Concept:** ${userPrompt}\n\n## Core Objectives\n- Maximize offline code-generation safety and performance.\n- Build a polished, zero-external-api suite of features.\n\n## Feature Scope\n- Low latency real-time inline completions.\n- Dynamic context chat with AST structural metadata.\n- Insulated terminal execution loop with strict user approval gates.`;
             
-            architecture = `# Architecture Context\n\n## Directives\n- **Client Layer:** Modular VS Code interface elements (Providers, Sidebar Webviews).\n- **Inference Layer:** Clean local Keep-Alive pipeline hooked into Ollama.\n- **Routing Layer:** Smart 1.5B token intent classifier dispatcher.\n- **Data Layer:** Local file-tree context maps and dependency AST crawler.`;
+            architecture = '# Architecture Context\n\n## Directives\n- **Client Layer:** Modular VS Code interface elements (Providers, Sidebar Webviews).\n- **Inference Layer:** Clean local Keep-Alive pipeline hooked into Ollama.\n- **Routing Layer:** Smart 1.5B token intent classifier dispatcher.\n- **Data Layer:** Local file-tree context maps and dependency AST crawler.';
             
-            standards = `# Code Standards\n\n## TypeScript Specifications\n- Strict compile-time checks with zero \`any\` statements.\n- Explicit interface schemas with strict return typings.\n- Always wrap async tool calls inside Try/Catch failure boundaries.\n- Named imports only — no namespace destructuring or partial exports.`;
+            standards = '# Code Standards\n\n## TypeScript Specifications\n- Strict compile-time checks with zero `any` statements.\n- Explicit interface schemas with strict return typings.\n- Always wrap async tool calls inside Try/Catch failure boundaries.\n- Named imports only — no namespace destructuring or partial exports.';
             
-            uiContext = `# UI Context\n\n## Aesthetic Settings\n- **Theme Archetype:** Premium, high-contrast Slate/Obsidian Dark Theme.\n- **Typography Layout:** Space Grotesk display headings paired with JetBrains Mono code blocks.\n- **Touch Target Density:** Fluid interactive sizes matching VS Code density.`;
+            uiContext = '# UI Context\n\n## Aesthetic Settings\n- **Theme Archetype:** Premium, high-contrast Slate/Obsidian Dark Theme.\n- **Typography Layout:** Space Grotesk display headings paired with JetBrains Mono code blocks.\n- **Touch Target Density:** Fluid interactive sizes matching VS Code density.';
         }
 
         progressTracker = `# Progress Tracker\n\n## Operational Pipeline\n\n| Phase | Task / Feature | Spec File | Status | Last Updated |\n| :--- | :--- | :--- | :--- | :--- |\n| Scope Map | Initial Workspace Scaffolded | N/A | Completed | ${new Date().toISOString()} |\n`;

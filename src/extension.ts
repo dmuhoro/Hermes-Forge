@@ -56,9 +56,9 @@ export function activate(context: vscode.ExtensionContext) {
         }
 
         const goal = await vscode.window.showInputBox({ 
-            prompt: "What should the agent execute?",
-            placeHolder: "e.g. Build a React scaffold, or find and fix type errors",
-            value: contextHint ? `Refactor this block: ` : ''
+            prompt: 'What should the agent execute?',
+            placeHolder: 'e.g. Build a React scaffold, or find and fix type errors',
+            value: contextHint ? 'Refactor this block: ' : ''
         });
         
         if (goal) {

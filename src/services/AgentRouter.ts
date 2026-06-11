@@ -56,7 +56,7 @@ USER PROMPT: ${userPrompt}`;
             }
         }
 
-        logger.info(`[Router] Classified task execution context`, { 
+        logger.info('[Router] Classified task execution context', { 
             category, 
             promptLength: userPrompt.length 
         });
@@ -77,19 +77,19 @@ USER PROMPT: ${userPrompt}`;
         // 3. Dispatch Execution Based on Classification
         switch (category) {
             case TaskCategory.AUTOCOMPLETE_OR_EDIT:
-                this.chatProvider.sendSystemNotification(`⚡️ **Router**: Task identified as Edit. Routing to fast Qwen-1.5B...`);
+                this.chatProvider.sendSystemNotification('⚡️ **Router**: Task identified as Edit. Routing to fast Qwen-1.5B...');
                 await this.chatProvider.streamResponse(userPrompt, enhancedContext, this.ollama.modelCompletion);
                 break;
                 
             case TaskCategory.EXPLAIN_OR_AUDIT:
-                this.chatProvider.sendSystemNotification(`🧠 **Router**: Task identified as Explanation. Routing to standard deep logic Hermes-8B...`);
+                this.chatProvider.sendSystemNotification('🧠 **Router**: Task identified as Explanation. Routing to standard deep logic Hermes-8B...');
                 await this.chatProvider.streamResponse(userPrompt, enhancedContext, this.ollama.modelChat);
                 break;
                 
             case TaskCategory.COMPLEX_AGENTIC:
-                this.chatProvider.sendSystemNotification(`⚙️ **Router**: High-complexity objective identified. Handing off to the background Agent Engine loop execution...`);
+                this.chatProvider.sendSystemNotification('⚙️ **Router**: High-complexity objective identified. Handing off to the background Agent Engine loop execution...');
                 const agent = new AgentEngine(this.ollama);
-                await agent.startAgentLoop(userPrompt + `\n\n` + enhancedContext);
+                await agent.startAgentLoop(userPrompt + '\n\n' + enhancedContext);
                 break;
         }
     }

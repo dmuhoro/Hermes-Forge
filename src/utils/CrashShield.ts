@@ -144,7 +144,7 @@ export class CrashShield {
             }
             watchTimer = setTimeout(() => {
                 logger.error(`[CrashShield] STALL ALERT: "${label}" did not output a token for 12 seconds. Triggering abort cancel signal.`);
-                vscode.window.showErrorMessage(`[HermesForge CrashShield] Stalled Local Model process aborted to prevent Host freeze.`);
+                vscode.window.showErrorMessage('[HermesForge CrashShield] Stalled Local Model process aborted to prevent Host freeze.');
                 abortController.abort();
             }, 12000);
         };

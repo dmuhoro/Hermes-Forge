@@ -149,7 +149,7 @@ To help us parse your updates programmatically, you MUST wrap the fully updated,
 Use exactly the relative paths shown in the FILE headers above (do not append the string "ERROR SCOPE BLOCK..." or "RECENTLY MODIFIED" to the filepath).
 Do not write normal explanations or commentary outside the file markers.`;
 
-            logger.info(`[VerificationEngine] Dispatching compiler healing query to local Hermes3:8b model...`);
+            logger.info('[VerificationEngine] Dispatching compiler healing query to local Hermes3:8b model...');
             
             let modelResponse = '';
             try {
@@ -326,7 +326,7 @@ Do not write normal explanations or commentary outside the file markers.`;
         try {
             content = await fs.readFile(trackerPath, 'utf8');
         } catch {
-            content = `# Progress Tracker\n\n| Phase | Task | Specification | Status | Updated |\n| :--- | :--- | :--- | :--- | :--- |\n`;
+            content = '# Progress Tracker\n\n| Phase | Task | Specification | Status | Updated |\n| :--- | :--- | :--- | :--- | :--- |\n';
         }
 
         const dateStr = new Date().toISOString();
@@ -342,7 +342,7 @@ Do not write normal explanations or commentary outside the file markers.`;
 
         await fs.mkdir(path.dirname(trackerPath), { recursive: true });
         await fs.writeFile(trackerPath, content, 'utf8');
-        logger.info(`[VerificationEngine] Saved verification log to progress tracker.`);
+        logger.info('[VerificationEngine] Saved verification log to progress tracker.');
     }
 
     /**

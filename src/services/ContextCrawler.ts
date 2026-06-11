@@ -92,10 +92,10 @@ export class ContextCrawler {
         
         if (allFiles.length <= 1) {
             timerStop();
-            return ""; // No additional local dependencies found
+            return ''; // No additional local dependencies found
         }
         
-        let expandedContext = "";
+        let expandedContext = '';
         for (const file of allFiles) {
             // Prevent duplicating the primary file that the user is actively staring at
             if (file === filePath) continue; 

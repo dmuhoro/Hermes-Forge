@@ -6,11 +6,9 @@
   "publisher": "hermesforge-studios",
   "repository": {
     "type": "git",
-    "url": "https://github.com/dannymuhoro/hermes-forge.git"
+    "url": "https://github.com/dmuhoro/Hermes-Forge.git"
   },
-  "engines": {
-    "vscode": "^1.85.0"
-  },
+  "engines": { "vscode": "^1.85.0" },
   "activationEvents": [
     "onView:hermes-forge.chatView",
     "onView:hermes-forge.dashboardView",
@@ -18,51 +16,39 @@
   ],
   "main": "./dist/extension.js",
   "contributes": {
-    "commands": [
-      {
-        "command": "hermes-forge.runAgent",
-        "title": "HermesForge: Run Local Agent"
-      }
-    ],
+    "commands": [{ "command": "hermes-forge.runAgent", "title": "HermesForge: Run Local Agent" }],
     "viewsContainers": {
-      "activitybar": [
-        {
-          "id": "hermes-forge-sidebar",
-          "title": "HermesForge",
-          "icon": "$(hubot)"
-        }
-      ]
+      "activitybar": [{ "id": "hermes-forge-sidebar", "title": "HermesForge", "icon": "$(hubot)" }]
     },
     "views": {
       "hermes-forge-sidebar": [
-        {
-          "type": "webview",
-          "id": "hermes-forge.chatView",
-          "name": "Context Chat"
-        },
-        {
-          "type": "webview",
-          "id": "hermes-forge.dashboardView",
-          "name": "Executive Control Center"
-        }
+        { "type": "webview", "id": "hermes-forge.chatView", "name": "Context Chat" },
+        { "type": "webview", "id": "hermes-forge.dashboardView", "name": "Executive Control Center" }
       ]
     }
   },
   "scripts": {
+    "start": "npm run dev",
     "vscode:prepublish": "npm run build",
     "build": "esbuild src/extension.ts --bundle --outfile=dist/extension.js --external:vscode --format=cjs --platform=node",
     "watch": "esbuild src/extension.ts --bundle --outfile=dist/extension.js --external:vscode --format=cjs --platform=node --watch",
-    "dev": "node -e \"require('http').createServer((req,res)=>{res.writeHead(200,{'Content-Type':'text/plain'});res.end('VS Code Extension Workspace Ready.\\n\\nThis project is pure backend/VS Code architecture, there is no web frontend.\\n\\nCodebase generated perfectly.');}).listen(3000,()=>console.log('Dummy server running on 3000 to satisfy preview environment.'))\"",
-    "start": "npm run dev",
-    "lint": "tsc --noEmit",
-    "version:patch": "vsce version patch",
-    "build:prod": "tsc -p ./ && vsce package"
+    "dev": "node -e \"require('http').createServer((req,res)=>{res.writeHead(200,{'Content-Type':'text/plain'});res.end('VS Code Extension Workspace Ready.');}).listen(3000,()=>console.log('Dummy server running on 3000'));\"",
+    "lint": "eslint src --ext .ts && tsc --noEmit",
+    "lint:fix": "eslint src --ext .ts --fix",
+    "test": "vitest run",
+    "test:watch": "vitest watch",
+    "test:integration": "vitest run src/__tests__/integration",
+    "build:prod": "tsc -p ./ && vsce package",
+    "version:patch": "vsce version patch"
   },
-  "dependencies": {},
   "devDependencies": {
     "@types/node": "^22.14.0",
     "@types/vscode": "^1.80.0",
+    "@typescript-eslint/eslint-plugin": "^8.61.0",
+    "@typescript-eslint/parser": "^8.61.0",
     "esbuild": "^0.25.0",
-    "typescript": "~5.8.2"
+    "eslint": "^10.4.1",
+    "typescript": "~5.8.2",
+    "vitest": "^4.1.8"
   }
 }

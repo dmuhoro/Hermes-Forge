@@ -17,7 +17,7 @@ export class AgentEngine {
 
     constructor(ollama: OllamaClient) {
         this.ollama = ollama;
-        this.outputChannel = vscode.window.createOutputChannel("HermesForge Agent");
+        this.outputChannel = vscode.window.createOutputChannel('HermesForge Agent');
     }
 
     private getWorkspaceRoot(): string {
@@ -33,7 +33,7 @@ export class AgentEngine {
                 if (stderr) output.push(`STDERR:\n${stderr}`);
                 if (error) output.push(`ERROR:\n${error.message}`);
                 
-                resolve(output.join('\n') || "Command executed successfully with no output.");
+                resolve(output.join('\n') || 'Command executed successfully with no output.');
             });
             activeSubprocesses.push(childProc);
         });
@@ -65,7 +65,7 @@ export class AgentEngine {
      */
     public async executeTask(userGoal: string): Promise<void> {
         // 1. COMPACT CONTEXT STRUCTURE: Crawl dependencies for targeted context
-        let activeFilePath = "";
+        let activeFilePath = '';
         const activeEditor = vscode.window.activeTextEditor;
         if (activeEditor) {
             activeFilePath = activeEditor.document.fileName;
@@ -114,14 +114,14 @@ When task is finished or satisfied, respond exactly: Done.`;
         ];
 
         let iteration = 0;
-        let activeResponse = "";
+        let activeResponse = '';
 
         while (iteration < this.MAX_DEPTH) {
             iteration++;
             this.outputChannel.appendLine(`\n>>> [Step ${iteration}/${this.MAX_DEPTH}] Reasoning with qwen2.5-coder:3b...`);
             
             try {
-                activeResponse = "";
+                activeResponse = '';
 
                 // Stream completion with low temperature & keep load low
                 const stream = this.ollama.streamChat(chatMessages, {
@@ -142,7 +142,7 @@ When task is finished or satisfied, respond exactly: Done.`;
                 logger.debug(`[AgentEngine] Stream response: ${trimmedResponse}`);
 
                 if (trimmedResponse.toLowerCase().includes('done.')) {
-                    this.outputChannel.appendLine(`\n[Agent Concluded Success]: Task parameters satisfied.`);
+                    this.outputChannel.appendLine('\n[Agent Concluded Success]: Task parameters satisfied.');
                     break;
                 }
 
@@ -160,13 +160,13 @@ When task is finished or satisfied, respond exactly: Done.`;
                         });
                         chatMessages.push({
                             role: 'user',
-                            content: `Format Error: Response was not valid minified JSON. Fix and retry.`
+                            content: 'Format Error: Response was not valid minified JSON. Fix and retry.'
                         });
                         continue;
                     }
 
                     this.outputChannel.appendLine(`\n[Executing Tool]: "${toolBlock.tool || 'unknown'}"`);
-                    let outcome = "";
+                    let outcome = '';
 
                     if (toolBlock.tool === 'read') {
                         const relPath = toolBlock.path;
@@ -190,22 +190,22 @@ When task is finished or satisfied, respond exactly: Done.`;
                         // Security check intercepting natively before executing Node subprocess
                         const securityVerdict = SecurityGuard.validateCommand(command);
                         if (!securityVerdict.isSafe) {
-                            const errReason = securityVerdict.reason || "Violates secure system policy.";
+                            const errReason = securityVerdict.reason || 'Violates secure system policy.';
                             vscode.window.showErrorMessage(`[HermesForge Security Safeguard] ${errReason}`);
                             this.outputChannel.appendLine(`\n🚨 [SECURITY INFRACTION BLOCKED]: ${errReason}`);
-                            outcome = `Execution Gated: Command violates secure system validation policy.`;
+                            outcome = 'Execution Gated: Command violates secure system validation policy.';
                         } else {
                             const approveChoice = await vscode.window.showWarningMessage(
                                 `Agent requested command execution:\n\n${command}`,
                                 { modal: true },
-                                "Approve Run",
-                                "Cancel Loop"
+                                'Approve Run',
+                                'Cancel Loop'
                             );
 
-                            if (approveChoice === "Approve Run") {
+                            if (approveChoice === 'Approve Run') {
                                 outcome = await this.executeCommand(command);
                             } else {
-                                this.outputChannel.appendLine(`\n[Cancelled Interface]: Execution rejected by user.`);
+                                this.outputChannel.appendLine('\n[Cancelled Interface]: Execution rejected by user.');
                                 break;
                             }
                         }
@@ -213,7 +213,7 @@ When task is finished or satisfied, respond exactly: Done.`;
                         outcome = `Error: Unknown tool type '${toolBlock.tool}'.`;
                     }
 
-                    const resultSnippet = outcome.length > 1500 ? outcome.substring(0, 1500) + "\n...[Truncated for memory]" : outcome;
+                    const resultSnippet = outcome.length > 1500 ? outcome.substring(0, 1500) + '\n...[Truncated for memory]' : outcome;
                     this.outputChannel.appendLine(`\n[Outcome]:\n${resultSnippet}`);
 
                     chatMessages.push({
@@ -240,7 +240,7 @@ When task is finished or satisfied, respond exactly: Done.`;
                 break;
             } finally {
                 // STATE RECLAIM: Explicitly run global GC hint if available and clear temp variables
-                activeResponse = "";
+                activeResponse = '';
                 if (global && typeof (global as any).gc === 'function') {
                     try {
                         (global as any).gc();
@@ -250,7 +250,7 @@ When task is finished or satisfied, respond exactly: Done.`;
         }
 
         if (iteration >= this.MAX_DEPTH) {
-            this.outputChannel.appendLine(`\n[Agent Terminated]: Loop reached maximum threshold bounds.`);
+            this.outputChannel.appendLine('\n[Agent Terminated]: Loop reached maximum threshold bounds.');
         }
     }
 
@@ -259,9 +259,9 @@ When task is finished or satisfied, respond exactly: Done.`;
      */
     public async startAgentLoop(goal: string): Promise<void> {
         this.outputChannel.show(true);
-        this.outputChannel.appendLine("=========================================");
+        this.outputChannel.appendLine('=========================================');
         this.outputChannel.appendLine(`[Agent Loop Triggered]\nGoal: ${goal}`);
-        this.outputChannel.appendLine("=========================================\n");
+        this.outputChannel.appendLine('=========================================\n');
 
         await this.executeTask(goal);
     }
