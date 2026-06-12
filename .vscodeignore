@@ -12,9 +12,17 @@ node_modules/**
 jest.config.js
 .env.example
 .telemetry/**
+.hermes/**
+*.vsix
 __tests__/**
 vsc-extension-quickstart.md
 webpack.config.js
+AGENTS.md
+DEMO.md
+RELEASE.md
+assets/.aistudio/**
+.gitignore
+.vscodeignore
 *.ts
 *.js
 *.json

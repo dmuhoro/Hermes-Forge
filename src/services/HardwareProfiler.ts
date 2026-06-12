@@ -25,9 +25,80 @@ export interface ModelAllocationConfig {
     offlineMode: boolean;
 }
 
+export interface LiveHardwareMetrics {
+    cpuLoad: number;
+    totalMemoryGB: number;
+    freeMemoryGB: number;
+    usedMemoryGB: number;
+    memoryUsagePct: number;
+}
+
 export class HardwareProfiler {
     private static isOfflineCache: boolean | null = null;
     private static lastCheckTime: number = 0;
+
+    /**
+     * Measures current CPU usage over a short 100ms interval
+     */
+    public static getCPULoad(): Promise<number> {
+        return new Promise((resolve) => {
+            const startCPUs = os.cpus();
+            if (!startCPUs || startCPUs.length === 0) {
+                resolve(0);
+                return;
+            }
+
+            const startTimes = startCPUs.map(cpu => cpu.times);
+            setTimeout(() => {
+                const endCPUs = os.cpus();
+                if (!endCPUs || endCPUs.length === 0) {
+                    resolve(0);
+                    return;
+                }
+
+                const endTimes = endCPUs.map(cpu => cpu.times);
+                let totalDiff = 0;
+                let idleDiff = 0;
+
+                for (let i = 0; i < Math.min(startTimes.length, endTimes.length); i++) {
+                    const start = startTimes[i];
+                    const end = endTimes[i];
+
+                    const startTotal = start.user + start.nice + start.sys + start.idle + start.irq;
+                    const endTotal = end.user + end.nice + end.sys + end.idle + end.irq;
+
+                    totalDiff += (endTotal - startTotal);
+                    idleDiff += (end.idle - start.idle);
+                }
+
+                const cpuPercentage = totalDiff > 0 ? (1 - (idleDiff / totalDiff)) * 100 : 0;
+                resolve(parseFloat(Math.min(100, Math.max(0, cpuPercentage)).toFixed(1)));
+            }, 100);
+        });
+    }
+
+    /**
+     * Gathers quick system telemetry for alive CPU/RAM metrics
+     */
+    public static async getLiveMetrics(): Promise<LiveHardwareMetrics> {
+        const totalBytes = os.totalmem();
+        const freeBytes = os.freemem();
+
+        const totalGB = parseFloat((totalBytes / (1024 * 1024 * 1024)).toFixed(2));
+        const freeGB = parseFloat((freeBytes / (1024 * 1024 * 1024)).toFixed(2));
+        const usedGB = parseFloat((totalGB - freeGB).toFixed(2));
+
+        const memoryUsagePct = parseFloat(((usedGB / totalGB) * 100).toFixed(1));
+        const cpuLoad = await this.getCPULoad();
+
+        return {
+            cpuLoad,
+            totalMemoryGB: totalGB,
+            freeMemoryGB: freeGB,
+            usedMemoryGB: usedGB,
+            memoryUsagePct
+        };
+    }
 
     /**
      * Categorizes system RAM configuration and outputs optimized Ollama request variables

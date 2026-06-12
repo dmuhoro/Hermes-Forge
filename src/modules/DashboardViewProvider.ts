@@ -3,6 +3,7 @@ import * as fs from 'fs/promises';
 import * as path from 'path';
 import { OllamaClient } from '../services/OllamaClient';
 import { ExecutiveOrchestrator } from '../services/ExecutiveOrchestrator';
+import { HardwareProfiler } from '../services/HardwareProfiler';
 import { logger } from '../utils/Logger';
 
 export class DashboardViewProvider implements vscode.WebviewViewProvider {
@@ -17,6 +18,21 @@ export class DashboardViewProvider implements vscode.WebviewViewProvider {
     public postMessage(message: any): void {
         if (this._view) {
             this._view.webview.postMessage(message);
+        }
+    }
+
+    public async refreshVelocityMetrics(): Promise<void> {
+        if (this._view) {
+            try {
+                const { DevVelocityManager } = await import('../services/DevVelocityManager');
+                const metrics = await DevVelocityManager.getInstance().getMetrics();
+                this._view.webview.postMessage({
+                    type: 'velocityMetrics',
+                    metrics
+                });
+            } catch (err: any) {
+                logger.error('Failed to post velocity metrics to webview', err);
+            }
         }
     }
 
@@ -41,9 +57,13 @@ export class DashboardViewProvider implements vscode.WebviewViewProvider {
                     type: 'configUpdate',
                     enableCloudFallback: !!config.get<boolean>('enableCloudFallback'),
                     premiumAdvancedRAG: !!config.get<boolean>('premiumAdvancedRAG'),
+                    fastDraftMode: !!config.get<boolean>('fastDraftMode'),
+                    aiLaborTeamSize: config.get<number>('aiLaborTeamSize') || 3,
                     nodePort: config.get<number>('nodePort') || 11435,
                     nodeEnabled: config.get<boolean>('nodeEnabled') !== false
                 });
+                // Sync DevVelocity metrics on hydration
+                this.refreshVelocityMetrics();
             }
         };
 
@@ -65,7 +85,23 @@ export class DashboardViewProvider implements vscode.WebviewViewProvider {
             }
         });
 
+        // Set up background polling for real-time hardware telemetry (CPU & RAM)
+        const metricsInterval = setInterval(async () => {
+            if (webviewView.visible) {
+                try {
+                    const metrics = await HardwareProfiler.getLiveMetrics();
+                    webviewView.webview.postMessage({
+                        type: 'liveHardwareMetrics',
+                        metrics
+                    });
+                } catch (err: any) {
+                    logger.error('Failed to post live hardware metrics to webview', err);
+                }
+            }
+        }, 3000);
+
         webviewView.onDidDispose(() => {
+            clearInterval(metricsInterval);
             unsubscribe();
             configDisposable.dispose();
         });
@@ -124,6 +160,17 @@ export class DashboardViewProvider implements vscode.WebviewViewProvider {
                 const current = !!config.get<boolean>(flag);
                 await config.update(flag, !current, vscode.ConfigurationTarget.Global);
                 vscode.window.showInformationMessage(`Premium Setting Saved: ${flag} is now ${!current ? 'ENABLED' : 'DISABLED'}`);
+                sendConfigUpdate();
+            } else if (data.type === 'toggleFastDraftFlag') {
+                const config = vscode.workspace.getConfiguration('hermes-forge');
+                const current = !!config.get<boolean>('fastDraftMode');
+                await config.update('fastDraftMode', !current, vscode.ConfigurationTarget.Global);
+                vscode.window.showInformationMessage(`Fast-Draft Mode is now ${!current ? 'ENABLED' : 'DISABLED'}`);
+                sendConfigUpdate();
+            } else if (data.type === 'updateTeamSize') {
+                const config = vscode.workspace.getConfiguration('hermes-forge');
+                const value = parseInt(data.value, 10) || 3;
+                await config.update('aiLaborTeamSize', value, vscode.ConfigurationTarget.Global);
                 sendConfigUpdate();
             }
         });
@@ -677,6 +724,78 @@ export class DashboardViewProvider implements vscode.WebviewViewProvider {
         </div>
     </div>
 
+    <!-- Real-time Hardware Health Dashboard -->
+    <div class="matrix-container" style="margin-top: 12px;">
+        <div class="section-title">⚡️ System Health &amp; Hardware Telemetry</div>
+        <div style="background: rgba(16, 21, 30, 0.7); border: 1px solid var(--border-color); border-radius: 4px; padding: 12px; display: flex; flex-direction: column; gap: 10px;">
+            <!-- CPU Load Row -->
+            <div style="display: flex; flex-direction: column; gap: 4px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; font-size: 11px;">
+                    <span>CPU Core Load:</span>
+                    <span id="hardware-cpu-val" style="font-family: var(--font-mono); font-weight: bold; color: var(--neon-mint);">0.0%</span>
+                </div>
+                <div style="width: 100%; height: 6px; background: #0c0f13; border-radius: 3px; overflow: hidden; border: 1px solid var(--border-color);">
+                    <div id="hardware-cpu-bar" style="width: 0%; height: 100%; background: var(--neon-mint); transition: width 0.3s ease-out;"></div>
+                </div>
+            </div>
+            <!-- RAM Memory Row -->
+            <div style="display: flex; flex-direction: column; gap: 4px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; font-size: 11px;">
+                    <span>RAM Allocation:</span>
+                    <span id="hardware-ram-val" style="font-family: var(--font-mono); font-weight: bold; color: var(--cool-blue);">0.0 / 0.0 GB (0%)</span>
+                </div>
+                <div style="width: 100%; height: 6px; background: #0c0f13; border-radius: 3px; overflow: hidden; border: 1px solid var(--border-color);">
+                    <div id="hardware-ram-bar" style="width: 0%; height: 100%; background: var(--cool-blue); transition: width 0.3s ease-out;"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Local DevVelocity Metrics Telemetry Panel -->
+    <div class="matrix-container" style="margin-top: 12px;">
+        <div class="section-title">📊 DevVelocity Telemetry (Local Savings)</div>
+        <div style="background: rgba(0, 255, 170, 0.03); border: 1px solid rgba(0, 255, 170, 0.2); border-radius: 4px; padding: 12px; display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+            <div style="display: flex; flex-direction: column;">
+                <span style="font-size: 8px; opacity: 0.7; text-transform: uppercase; letter-spacing: 0.3px;">Est. Hours Saved</span>
+                <span id="vel-hours-saved" style="font-family: var(--font-mono); font-size: 18px; font-weight: bold; color: var(--neon-mint);">0.0h</span>
+            </div>
+            <div style="display: flex; flex-direction: column;">
+                <span style="font-size: 8px; opacity: 0.7; text-transform: uppercase; letter-spacing: 0.3px;">Sprints Completed</span>
+                <span id="vel-sprints" style="font-family: var(--font-mono); font-size: 18px; font-weight: bold; color: var(--cool-blue);">0</span>
+            </div>
+            <div style="display: flex; flex-direction: column;">
+                <span style="font-size: 8px; opacity: 0.7; text-transform: uppercase; letter-spacing: 0.3px;">LOC Crafted/Gen</span>
+                <span id="vel-loc" style="font-family: var(--font-mono); font-size: 12px; font-weight: bold; color: var(--neon-orange);">0 lines</span>
+            </div>
+            <div style="display: flex; flex-direction: column;">
+                <span style="font-size: 8px; opacity: 0.7; text-transform: uppercase; letter-spacing: 0.3px;">Rollbacks Preempted</span>
+                <span id="vel-rollbacks" style="font-family: var(--font-mono); font-size: 12px; font-weight: bold; color: var(--neon-pink);">0 times</span>
+            </div>
+            <div style="grid-column: span 2; display: flex; justify-content: space-between; align-items: center; border-top: 1px solid rgba(255, 255, 255, 0.05); padding-top: 6px; margin-top: 2px;">
+                <span style="font-size: 8px; opacity: 0.6; text-transform: uppercase; letter-spacing: 0.3px;">Total Agent Steps:</span>
+                <span id="vel-ops" style="font-family: var(--font-mono); font-size: 9px; font-weight: bold; color: #fff;">0</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- AI Labor Team Panel -->
+    <div class="matrix-container" style="margin-top: 12px;">
+        <div class="section-title">👥 AI Labor Team Squad Configuration</div>
+        <div style="background: rgba(16, 21, 30, 0.7); border: 1px solid var(--border-color); border-radius: 4px; padding: 12px; display: flex; flex-direction: column; gap: 10px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; font-size: 11px;">
+                <span>Autonomous Squad Size</span>
+                <span id="team-size-val" style="font-family: var(--font-mono); color: var(--cool-blue); font-weight: bold;">3 Agents</span>
+            </div>
+            <div style="display: flex; align-items: center; gap: 8px;">
+                <input type="range" id="team-slider" min="1" max="8" value="3" style="flex: 1; accent-color: var(--cool-blue); background: #0c0f13; border: 1px solid var(--border-color); height: 4px; border-radius: 2px; cursor: pointer;">
+            </div>
+            <div style="display: flex; justify-content: space-between; align-items: center; font-size: 11px; border-top: 1px solid var(--border-color); padding-top: 8px;">
+                <span>Fast-Draft Mode (One-Shot)</span>
+                <div class="toggle-container" id="toggle-fast-draft" style="cursor: pointer;">OFF</div>
+            </div>
+        </div>
+    </div>
+
     <!-- Monetization & Premium Panel -->
     <div class="matrix-container" style="margin-top: 12px;">
         <div class="section-title">💎 License & Premium Options</div>
@@ -862,9 +981,12 @@ export class DashboardViewProvider implements vscode.WebviewViewProvider {
             else if (msg.type === 'configUpdate') {
                 const cloudActive = !!msg.enableCloudFallback;
                 const ragActive = !!msg.premiumAdvancedRAG;
+                const fastDraftActive = !!msg.fastDraftMode;
+                const teamSize = msg.aiLaborTeamSize || 3;
 
                 const toggleCloud = document.getElementById('toggle-cloud');
                 const toggleRag = document.getElementById('toggle-rag');
+                const toggleFastDraft = document.getElementById('toggle-fast-draft');
 
                 if (cloudActive) {
                     toggleCloud.className = 'toggle-container active';
@@ -880,6 +1002,23 @@ export class DashboardViewProvider implements vscode.WebviewViewProvider {
                 } else {
                     toggleRag.className = 'toggle-container';
                     toggleRag.textContent = 'OFF';
+                }
+
+                if (toggleFastDraft) {
+                    if (fastDraftActive) {
+                        toggleFastDraft.className = 'toggle-container active';
+                        toggleFastDraft.textContent = 'ON';
+                    } else {
+                        toggleFastDraft.className = 'toggle-container';
+                        toggleFastDraft.textContent = 'OFF';
+                    }
+                }
+
+                const teamSlider = document.getElementById('team-slider');
+                const teamSizeVal = document.getElementById('team-size-val');
+                if (teamSlider && teamSizeVal) {
+                    teamSlider.value = teamSize;
+                    teamSizeVal.textContent = teamSize + (teamSize === 1 ? ' Agent' : ' Agents');
                 }
 
                 const serverPortSpan = document.getElementById('bridge-server-port');
@@ -913,7 +1052,47 @@ export class DashboardViewProvider implements vscode.WebviewViewProvider {
                     bSpeedBar.style.width = pct + '%';
                 }
             }
+            else if (msg.type === 'liveHardwareMetrics') {
+                const metrics = msg.metrics;
+                const cpuVal = document.getElementById('hardware-cpu-val');
+                const cpuBar = document.getElementById('hardware-cpu-bar');
+                const ramVal = document.getElementById('hardware-ram-val');
+                const ramBar = document.getElementById('hardware-ram-bar');
+
+                if (cpuVal) cpuVal.textContent = metrics.cpuLoad.toFixed(1) + '%';
+                if (cpuBar) cpuBar.style.width = metrics.cpuLoad + '%';
+                if (ramVal) {
+                    ramVal.textContent = metrics.usedMemoryGB.toFixed(1) + ' / ' + metrics.totalMemoryGB.toFixed(1) + ' GB (' + metrics.memoryUsagePct.toFixed(0) + '%)';
+                }
+                if (ramBar) ramBar.style.width = metrics.memoryUsagePct + '%';
+            }
+            else if (msg.type === 'velocityMetrics') {
+                const metrics = msg.metrics;
+                document.getElementById('vel-hours-saved').textContent = (metrics.hoursSaved || 0.0).toFixed(1) + 'h';
+                document.getElementById('vel-sprints').textContent = metrics.sprintsCompleted || 0;
+                document.getElementById('vel-loc').textContent = (metrics.linesOfCodeGenerated || 0) + ' lines';
+                document.getElementById('vel-rollbacks').textContent = (metrics.rollbacksPreempted || 0) + ' times';
+                document.getElementById('vel-ops').textContent = metrics.agentStepsExecuted || 0;
+            }
         });
+
+        const toggleFastDraftBtn = document.getElementById('toggle-fast-draft');
+        if (toggleFastDraftBtn) {
+            toggleFastDraftBtn.addEventListener('click', () => {
+                vscode.postMessage({ type: 'toggleFastDraftFlag' });
+            });
+        }
+
+        const teamSliderEl = document.getElementById('team-slider');
+        if (teamSliderEl) {
+            teamSliderEl.addEventListener('input', (e) => {
+                const val = e.target.value;
+                document.getElementById('team-size-val').textContent = val + (val === '1' ? ' Agent' : ' Agents');
+            });
+            teamSliderEl.addEventListener('change', (e) => {
+                vscode.postMessage({ type: 'updateTeamSize', value: e.target.value });
+            });
+        }
 
         // Toggle settings event listeners
         document.getElementById('toggle-cloud').addEventListener('click', () => {

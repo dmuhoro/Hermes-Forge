@@ -11,6 +11,8 @@ import { PRGenerator } from './services/PRGenerator';
 import { HardwareProfiler } from './services/HardwareProfiler';
 import { OpenClawBridge } from './services/OpenClawBridge';
 import { ContextCrawler } from './services/ContextCrawler';
+import { PreCommitHookManager } from './services/PreCommitHookManager';
+import { CheckpointManager } from './services/CheckpointManager';
 import { logger } from './utils/Logger';
 import * as fs from 'fs/promises';
 import * as path from 'path';
@@ -51,6 +53,14 @@ export function activate(context: vscode.ExtensionContext) {
     statusBarItem.show();
     context.subscriptions.push(statusBarItem);
 
+    // Create a status bar item for active model switching
+    const modelStatusBarItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, 99);
+    modelStatusBarItem.command = 'hermes-forge.changeActiveModels';
+    modelStatusBarItem.text = `$(gear) Models: [${modelCompletion} | ${modelChat.split(':')[0]}]`;
+    modelStatusBarItem.tooltip = 'Click to switch active Ollama Autocomplete or Chat models';
+    modelStatusBarItem.show();
+    context.subscriptions.push(modelStatusBarItem);
+
     // Subscribe status bar to heartbeat status changes
     const unsubscribeStatus = ollama.onStatusChange((status) => {
         if (!status.connected) {
@@ -81,6 +91,7 @@ export function activate(context: vscode.ExtensionContext) {
             ollama.modelChat = upConfig.get<string>('modelChat') || 'hermes3:8b';
             
             statusBarItem.text = '$(sync~spin) HermesForge: Config Updated';
+            modelStatusBarItem.text = `$(gear) Models: [${ollama.modelCompletion} | ${ollama.modelChat.split(':')[0]}]`;
             ollama.checkConnection().then(() => ollama.checkModels());
 
             if (e.affectsConfiguration('hermes-forge.nodePort') || e.affectsConfiguration('hermes-forge.nodeEnabled')) {
@@ -218,6 +229,36 @@ export function activate(context: vscode.ExtensionContext) {
     });
     context.subscriptions.push(codebaseOracleCommand);
 
+    // Register Project Lifecycle Manager SDLC flow
+    const projectLifecycleCommand = vscode.commands.registerCommand('hermes-forge.projectLifecycle', async () => {
+        const { ProjectLifecycleManager } = await import('./services/ProjectLifecycleManager');
+        const lifecycleManager = new ProjectLifecycleManager(ollama);
+        await lifecycleManager.startLifecycleFlow();
+    });
+    context.subscriptions.push(projectLifecycleCommand);
+
+    // Register GitHub Actions CI Pipeline Generator
+    const generateCICommand = vscode.commands.registerCommand('hermes-forge.generateCI', async () => {
+        const { CIGenerator } = await import('./services/CIGenerator');
+        const generator = new CIGenerator();
+        await generator.generatePipeline();
+    });
+    context.subscriptions.push(generateCICommand);
+
+    // Register Cloud, Docker & Kubernetes Scaffolder
+    const scaffoldCloudCommand = vscode.commands.registerCommand('hermes-forge.scaffoldCloud', async () => {
+        const { CloudScaffolder } = await import('./services/CloudScaffolder');
+        const scaffolder = CloudScaffolder.getInstance();
+        await scaffolder.scaffoldCloudEnvironment();
+    });
+    context.subscriptions.push(scaffoldCloudCommand);
+
+    // Register Refresh Velocity Dashboard Command
+    const refreshVelocityCommand = vscode.commands.registerCommand('hermes-forge.refreshDashboardVelocity', async () => {
+        await dashboardProvider.refreshVelocityMetrics();
+    });
+    context.subscriptions.push(refreshVelocityCommand);
+
     // Register Git PR Generator
     const prSummaryCommand = vscode.commands.registerCommand('hermes-forge.generatePrSummary', async () => {
         const prGen = new PRGenerator(ollama);
@@ -324,6 +365,175 @@ export function activate(context: vscode.ExtensionContext) {
         });
     });
     context.subscriptions.push(exportContextCommand);
+
+    // Command 1: QuickCommands keyboard shortcut overlay (Ctrl+Shift+H)
+    const quickCommandsCommand = vscode.commands.registerCommand('hermes-forge.quickCommands', async () => {
+        const items = [
+            { label: '🏛  Chief Architect: Scaffold Cloud environments', detail: 'Generate Dockerfile, compose, K8s, Helm & Terraform configurations', command: 'hermes-forge.scaffoldCloud' },
+            { label: '📋 Product Manager: Plan Project Lifecycle / Sprint', detail: 'Bootstraps full specifications, user requirements and sequential task checklists', command: 'hermes-forge.projectLifecycle' },
+            { label: '💻 Principal Engineer: Run Specialized Local Agent', detail: 'Runs local code edits and interactive file assembly loops', command: 'hermes-forge.runAgent' },
+            { label: '🔄 JS to TS Migrator: Modernize legacy Javascript', detail: 'Inspects and migrates active JS files to strict TypeScript with tests', command: 'hermes-forge.legacyMigrate' },
+            { label: '⚡️ Bottleneck Auditor: Identify Performance issues', detail: 'Scans files for Big-O complexity, leakage and memory thrashing', command: 'hermes-forge.perfAudit' },
+            { label: '📦 PR Summary Builder: Formulate Conventional logs', detail: 'Renders complete PR logs and release changelogs from staged git diffs', command: 'hermes-forge.generatePrSummary' },
+            { label: '🧪 HW Speed Benchmark: System Benchmark Profiler', detail: 'Measures Ollama processing TPS, latencies and updates profile tiers', command: 'hermes-forge.benchmarkHardware' },
+            { label: '🔍 Scan Architectural Blueprint (Codebase Oracle)', detail: 'Scans the codebase to consult high-fidelity design migration insights', command: 'hermes-forge.codebaseOracle' },
+            { label: '📂 Export Workspace Context for external LLMs', detail: 'Compiles active workspace structural files into a highly dense context bundle', command: 'hermes-forge.exportContext' },
+            { label: '📁 Scaffold Semantic Git Pre-Commit Hook', detail: 'Scaffolds an offline git pre-commit hook scanning staged work for code quality', command: 'hermes-forge.scaffoldPreCommitHook' },
+            { label: '🛡️  Run On-Demand Git Pre-Commit Scan', detail: 'Checks currently staged documents immediately for vulnerabilities and errors', command: 'hermes-forge.preCommitCheck' },
+            { label: '💾 Save Project Sprint Task Checkpoint', detail: 'Saves active SDLC task states to secure offline workspace state backups', command: 'hermes-forge.saveCheckpoint' },
+            { label: '⏪ Restore Project Sprint Task Checkpoint', detail: 'Restores the last saved local SDLC feature sprint checklist state', command: 'hermes-forge.loadCheckpoint' },
+        ];
+
+        const selection = await vscode.window.showQuickPick(items, {
+            placeHolder: 'HermesForge: Select raw cybernetic agent instruction command or workspace action...',
+            matchOnDescription: true,
+            matchOnDetail: true
+        });
+
+        if (selection) {
+            vscode.commands.executeCommand(selection.command);
+        }
+    });
+    context.subscriptions.push(quickCommandsCommand);
+
+    // Command 2: Change Active Models Option popup
+    const changeActiveModelsCommand = vscode.commands.registerCommand('hermes-forge.changeActiveModels', async () => {
+        const targetSelection = await vscode.window.showQuickPick([
+            { label: '🚀  Autocomplete Model', description: 'Inline low-latency code completion model selection' },
+            { label: '🧠  Chat & Agentic Model', description: 'High-reasoning multi-agent collaboration model selection' }
+        ], {
+            placeHolder: 'HermesForge: Which intelligence layer would you like to update?'
+        });
+
+        if (!targetSelection) return;
+
+        const config = vscode.workspace.getConfiguration('hermes-forge');
+
+        if (targetSelection.label.includes('Autocomplete')) {
+            const autocompleteModels = [
+                { label: 'qwen2.5-coder:1.5b', description: 'Default fast lightweight coder model (highly recommended)' },
+                { label: 'qwen2.5-coder:0.5b', description: 'Ultra low latency, perfect for older laptops' },
+                { label: 'deepseek-coder:1.3b', description: 'Robust, fast local code completion model' },
+                { label: 'llama3.2:1b', description: 'Good general performance, fast completions' },
+                { label: '🖊️  Custom Model Name...', description: 'Enter a custom locally pulled Ollama completion model' }
+            ];
+
+            const chosen = await vscode.window.showQuickPick(autocompleteModels, {
+                placeHolder: `Select active autocomplete model (Current: ${ollama.modelCompletion})`
+            });
+
+            if (!chosen) return;
+
+            let modelName = chosen.label;
+            if (modelName.includes('Custom')) {
+                const customInput = await vscode.window.showInputBox({
+                    prompt: 'Enter custom Ollama model tag for Inline Autocomplete (e.g., codegemma:2b)',
+                    placeHolder: 'codegemma:2b'
+                });
+                if (!customInput) return;
+                modelName = customInput.trim();
+            }
+
+            await config.update('modelCompletion', modelName, vscode.ConfigurationTarget.Global);
+            vscode.window.showInformationMessage(`🟢 Autocomplete model updated to: ${modelName}`);
+        } else {
+            const chatModels = [
+                { label: 'hermes3:8b', description: 'Default fine-tuned executive assistant with rich system instructions (recommended)' },
+                { label: 'deepseek-r1:8b', description: 'Advanced DeepSeek-R1 distilled reasoning chain-of-thought model' },
+                { label: 'llama3.1:8b', description: 'Meta general-purpose chat/instructions model' },
+                { label: 'qwen2.5-coder:7b', description: 'High-accuracy code generations and structural refactors' },
+                { label: '🖊️  Custom Model Name...', description: 'Enter a custom locally pulled Ollama chat model' }
+            ];
+
+            const chosen = await vscode.window.showQuickPick(chatModels, {
+                placeHolder: `Select active chat & agent model (Current: ${ollama.modelChat})`
+            });
+
+            if (!chosen) return;
+
+            let modelName = chosen.label;
+            if (modelName.includes('Custom')) {
+                const customInput = await vscode.window.showInputBox({
+                    prompt: 'Enter custom Ollama model tag for Chat / Agent (e.g., mistral:7b)',
+                    placeHolder: 'mistral:7b'
+                });
+                if (!customInput) return;
+                modelName = customInput.trim();
+            }
+
+            await config.update('modelChat', modelName, vscode.ConfigurationTarget.Global);
+            vscode.window.showInformationMessage(`🧠 Chat & Agent model updated to: ${modelName}`);
+        }
+    });
+    context.subscriptions.push(changeActiveModelsCommand);
+
+    const getWorkspaceRoot = (): string => {
+        const folders = vscode.workspace.workspaceFolders;
+        return folders && folders.length > 0 ? folders[0].uri.fsPath : process.cwd();
+    };
+
+    // Command 3: Scaffold Semantic git Precommit hook
+    const scaffoldPreCommitCommand = vscode.commands.registerCommand('hermes-forge.scaffoldPreCommitHook', async () => {
+        const root = getWorkspaceRoot();
+        const res = await PreCommitHookManager.scaffoldHook(root);
+        if (res.success) {
+            vscode.window.showInformationMessage(res.message);
+        } else {
+            vscode.window.showWarningMessage(res.message);
+        }
+    });
+    context.subscriptions.push(scaffoldPreCommitCommand);
+
+    // Command 4: On-demand git staged code check
+    const preCommitCheckCommand = vscode.commands.registerCommand('hermes-forge.preCommitCheck', async () => {
+        const root = getWorkspaceRoot();
+        vscode.window.withProgress({
+            location: vscode.ProgressLocation.Notification,
+            title: 'HermesForge: Auditing staged code documents...'
+        }, async () => {
+            const res = await PreCommitHookManager.runOnDemandScan(root);
+            if (res.success) {
+                vscode.window.showInformationMessage(res.message);
+            } else {
+                const viewDetailsOption = 'View Issue Log';
+                const action = await vscode.window.showErrorMessage(res.message, viewDetailsOption);
+                if (action === viewDetailsOption && res.failures.length > 0) {
+                    const output = vscode.window.createOutputChannel('HermesForge Pre-Commit Issues');
+                    output.clear();
+                    output.appendLine('================================================================');
+                    output.appendLine('🛡️  HermesForge Git Staged Vulnerability Check Report');
+                    output.appendLine('================================================================');
+                    res.failures.forEach(f => output.appendLine(`❌ ${f}`));
+                    output.show();
+                }
+            }
+        });
+    });
+    context.subscriptions.push(preCommitCheckCommand);
+
+    // Command 5: Save active sprint task checkpoint
+    const saveCheckpointCommand = vscode.commands.registerCommand('hermes-forge.saveCheckpoint', async () => {
+        const root = getWorkspaceRoot();
+        const res = await CheckpointManager.saveCheckpoint(root);
+        if (res.success) {
+            vscode.window.showInformationMessage(res.message);
+        } else {
+            vscode.window.showWarningMessage(res.message);
+        }
+    });
+    context.subscriptions.push(saveCheckpointCommand);
+
+    // Command 6: Restore last saved checkpoint
+    const loadCheckpointCommand = vscode.commands.registerCommand('hermes-forge.loadCheckpoint', async () => {
+        const root = getWorkspaceRoot();
+        const res = await CheckpointManager.loadCheckpoint(root);
+        if (res.success) {
+            vscode.window.showInformationMessage(res.message);
+        } else {
+            vscode.window.showWarningMessage(res.message);
+        }
+    });
+    context.subscriptions.push(loadCheckpointCommand);
 }
 
 export function deactivate() {

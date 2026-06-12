@@ -98,4 +98,38 @@ describe('OllamaClient Unit Tests', () => {
 
     expect(resultChunks).toEqual(['const ', 'foo = 42;']);
   });
+
+  test('should return default false for cloud fallback check when unconfigured', () => {
+    expect(client.shouldUseCloudFallback()).toBe(false);
+  });
+
+  test('should return false for redirect check when cloud fallback is disabled', () => {
+    expect(client.shouldRedirectToCloud('Do something simple')).toBe(false);
+  });
+
+  test('should return true for redirect check if local Ollama is marked as disconnected (and fallback is active)', () => {
+    // Force shouldUseCloudFallback to return true by mocking vscode workspace configuration if needed,
+    // or we can spy on shouldUseCloudFallback directly
+    vi.spyOn(client, 'shouldUseCloudFallback').mockReturnValue(true);
+    // client.lastStatus.connected defaults to false since it is not marked true
+    expect(client.shouldRedirectToCloud('Simple request')).toBe(true);
+  });
+
+  test('should return true if prompt contains advanced technical cloud keywords', () => {
+    vi.spyOn(client, 'shouldUseCloudFallback').mockReturnValue(true);
+    // Explicitly set connected status to true to test keyword detection
+    const status = client.getStatus();
+    status.connected = true;
+
+    expect(client.shouldRedirectToCloud('Please configure our kubernetes multi-resource routing template')).toBe(true);
+    expect(client.shouldRedirectToCloud('Simple hello world')).toBe(false);
+  });
+
+  test('should return true if options override model is cloud-trigger', () => {
+    vi.spyOn(client, 'shouldUseCloudFallback').mockReturnValue(true);
+    const status = client.getStatus();
+    status.connected = true;
+
+    expect(client.shouldRedirectToCloud('Simple greet', { model: 'cloud-trigger' })).toBe(true);
+  });
 });

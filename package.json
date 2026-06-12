@@ -37,7 +37,9 @@
     "onCommand:hermes-forge.benchmarkHardware",
     "onCommand:hermes-forge.generatePrSummary",
     "onCommand:hermes-forge.exportContext",
-    "onCommand:hermes-forge.codebaseOracle"
+    "onCommand:hermes-forge.codebaseOracle",
+    "onCommand:hermes-forge.projectLifecycle",
+    "onCommand:hermes-forge.scaffoldCloud"
   ],
   "main": "./dist/extension.js",
   "contributes": {
@@ -81,6 +83,59 @@
         "command": "hermes-forge.codebaseOracle",
         "title": "HermesForge: Scan Architectural Blueprint & Migration Paths",
         "category": "HermesForge"
+      },
+      {
+        "command": "hermes-forge.projectLifecycle",
+        "title": "HermesForge: Orchestrate Full Project SDLC Sprint",
+        "category": "HermesForge"
+      },
+      {
+        "command": "hermes-forge.generateCI",
+        "title": "HermesForge: Generate Local-first GitHub Actions CI Profile",
+        "category": "HermesForge"
+      },
+      {
+        "command": "hermes-forge.scaffoldCloud",
+        "title": "HermesForge: Scaffold Cloud Infra, Docker & Kubernetes Configuration",
+        "category": "HermesForge"
+      },
+      {
+        "command": "hermes-forge.quickCommands",
+        "title": "HermesForge: Open QuickCommands Overlay",
+        "category": "HermesForge"
+      },
+      {
+        "command": "hermes-forge.changeActiveModels",
+        "title": "HermesForge: Switch Local Autocomplete/Chat Models",
+        "category": "HermesForge"
+      },
+      {
+        "command": "hermes-forge.scaffoldPreCommitHook",
+        "title": "HermesForge: Register Semantic Git Pre-commit Hook",
+        "category": "HermesForge"
+      },
+      {
+        "command": "hermes-forge.preCommitCheck",
+        "title": "HermesForge: Execute Offline Pre-commit Validation Scan",
+        "category": "HermesForge"
+      },
+      {
+        "command": "hermes-forge.saveCheckpoint",
+        "title": "HermesForge: Save Sprint Task Checkpoint",
+        "category": "HermesForge"
+      },
+      {
+        "command": "hermes-forge.loadCheckpoint",
+        "title": "HermesForge: Restore Last Saved Checkpoint",
+        "category": "HermesForge"
+      }
+    ],
+    "keybindings": [
+      {
+        "command": "hermes-forge.quickCommands",
+        "key": "ctrl+shift+h",
+        "mac": "cmd+shift+h",
+        "when": "editorTextFocus"
       }
     ],
     "configuration": {
@@ -126,10 +181,41 @@
           "default": false,
           "description": "Premium: Opt-in cloud model fallback if the local system encounters hardware limits or processing failures."
         },
+        "hermes-forge.cloudProvider": {
+          "type": "string",
+          "default": "gemini",
+          "enum": [
+            "gemini",
+            "claude",
+            "groq",
+            "grok"
+          ],
+          "description": "Premium: Target Frontier Cloud Provider when offline fallback is activated."
+        },
+        "hermes-forge.cloudApiKey": {
+          "type": "string",
+          "default": "",
+          "description": "Premium: API Key of the target Cloud Provider (saved locally on your machine)."
+        },
+        "hermes-forge.cloudModel": {
+          "type": "string",
+          "default": "",
+          "description": "Premium: Override the default cloud model name (e.g. 'gemini-2.5-pro' or 'claude-3-5-sonnet-latest')."
+        },
         "hermes-forge.premiumAdvancedRAG": {
           "type": "boolean",
           "default": false,
           "description": "Premium: Enables advanced recursive semantic retrieval (RAG) vector embeddings across the active workspace directory."
+        },
+        "hermes-forge.aiLaborTeamSize": {
+          "type": "integer",
+          "default": 3,
+          "description": "Number of simulated/parallel cooperative AI developer agent personas to coordinate in task assembly squads."
+        },
+        "hermes-forge.fastDraftMode": {
+          "type": "boolean",
+          "default": false,
+          "description": "Fast-Draft Mode: Rapid direct draft generation of code blocks with user sign-off, skipping agent feedback loops."
         }
       }
     },

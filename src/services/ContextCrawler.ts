@@ -374,11 +374,22 @@ export class ContextCrawler {
                     modLines += linesCount;
                     totalLines += linesCount;
                     
-                    if (content.includes('import * as vscode') || content.includes("require('vscode')")) fingerPrints.add('VS Code API');
-                    if (content.includes('react') || content.includes('React')) fingerPrints.add('React');
-                    if (content.includes('vitest') || content.includes('describe(')) fingerPrints.add('Testing Suite');
-                    if (content.includes('ollama') || content.includes('OllamaClient')) fingerPrints.add('Ollama AI');
-                    if (content.includes('express') || content.includes('http.createServer')) fingerPrints.add('Web Service Server');
+                    const ext = path.extname(f).toLowerCase();
+                    if (ext === '.ts' || ext === '.tsx') fingerPrints.add('TypeScript');
+                    if (ext === '.js' || ext === '.jsx') fingerPrints.add('JavaScript');
+                    if (ext === '.py') fingerPrints.add('Python');
+                    if (ext === '.rs') fingerPrints.add('Rust');
+                    if (ext === '.go') fingerPrints.add('Go');
+                    if (ext === '.kt' || ext === '.java') fingerPrints.add('JVM Core');
+                    if (ext === '.sh') fingerPrints.add('Shell Scripting');
+                    if (ext === '.yaml' || ext === '.yml') fingerPrints.add('Infrastructure Config');
+
+                    if (content.includes('import * as vscode') || content.includes("require('vscode')")) fingerPrints.add('VS Code Extension API');
+                    if (content.includes('react') || content.includes('React')) fingerPrints.add('React UX Framework');
+                    if (content.includes('vitest') || content.includes('describe(') || content.includes('test(')) fingerPrints.add('Testing Suite');
+                    if (content.includes('ollama') || content.includes('OllamaClient')) fingerPrints.add('Ollama API Integrations');
+                    if (content.includes('express') || content.includes('http.createServer')) fingerPrints.add('NodeJS HTTP server');
+                    if (content.includes('localStorage') || content.includes('fs/promises') || content.includes('fs.writeFile')) fingerPrints.add('Offline-First Persistence');
                     
                     keyFiles.push(path.basename(f));
                 } catch {
@@ -392,6 +403,9 @@ export class ContextCrawler {
             else if (relDir.includes('module') || relDir.includes('provider')) purpose = 'UX Modules enabling system events, editors, or custom interfaces.';
             else if (relDir.includes('test')) purpose = 'Suite of automated unit and integration tests validating code contracts and performance benchmarks.';
             else if (relDir.includes('utils') || relDir.includes('helper')) purpose = 'Lightweight modular code blocks protecting exception bounds or logging telemetry.';
+            else if (relDir.includes('views') || relDir.includes('components')) purpose = 'Interface view render components and presentation elements.';
+            else if (relDir.includes('db') || relDir.includes('models') || relDir.includes('schemas')) purpose = 'Schema modeling representation and local database queries.';
+            else if (relDir.includes('scripts') || relDir.includes('cli')) purpose = 'Automation scripts, deployment wrappers, and execution utilities.';
             
             subModules[relDir] = {
                 dirPath: relDir,

@@ -90,7 +90,7 @@ export class AgentEngine {
         }
     }
 
-    private async writeFile(filePath: string, content: string): Promise<string> {
+    public async writeFile(filePath: string, content: string): Promise<string> {
         try {
             const root = this.getWorkspaceRoot();
             const fullPath = path.resolve(root, filePath);

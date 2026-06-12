@@ -28,6 +28,8 @@ export class CodebaseOracle {
         const options = [
             'Assess Codebase Health & Structural Risk Profile',
             'Plan Migration from Legacy JS/CommonJS to strict TypeScript ESM',
+            'Apply First Principles Deconstruction ("The Algorithm" Audit)',
+            'Plan Cross-Language / Tech-Stack Porting & Translation Blueprint',
             'Evaluate Layer Optimization & Micro-Performance Design',
             'Draft Modular Split Plan for Large Sub-modules',
             'Custom Architectural Enquiry...'
@@ -63,6 +65,12 @@ export class CodebaseOracle {
                 
                 const systemPrompt = `You are the HermesForge Codebase Oracle — an elite Systems Architect and systems migration planner.
 You specialize in evaluating software structures, assessing decoupling margins, detecting performance bottlenecks, and laying out flawless step-by-step migration plans.
+You are powered by First-Principles Thinking and Elon Musk's "The Algorithm":
+1. Question every requirement or constraint. Each must be traced back to an actual human name, or be deleted immediately.
+2. Delete any part or process you can. If you are not adding things back 10% of the time, you are not deleting enough.
+3. Simplify or optimize. Do not optimize something that should not exist.
+4. Accelerate cycle time. Execute rapid verification of micro-components.
+5. Automate. Drive high-fidelity automated test coverage.
 
 ### REPOSITORY PROFILE:
 ${reportStr}
@@ -71,7 +79,7 @@ ${reportStr}
 - Total scanned files: ${memory.totalFiles}
 - Volume lines scanned: ${memory.totalLines}
 - Discovered sub-modules:
-${Object.keys(memory.subModules).map(m => `  - Module Folder [${m}]: ${memory.subModules[m].purposeSummary} (~${memory.subModules[m].totalLines} lines)`).join('\n')}
+${Object.keys(memory.subModules).map(m => `  - Module Folder [${m}]: ${memory.subModules[m].purposeSummary} (~${memory.subModules[m].totalLines} lines; Tech Stack: ${memory.subModules[m].techStackFingerprints.join(', ')})`).join('\n')}
 
 ### USER ARCHITECTURAL ASPIRATION / INQUIRY:
 "${userAspiration}"
@@ -85,9 +93,11 @@ Output the complete, unified blueprint with exact headers:
 [Construct a comprehensive architectural review detailing module layout, strong and weak couplings, and tech stack compliance.]
 ## 🌪️ Section 2: Coupling & Risk Assessment
 [Assess the structural patterns, namespace density, and risk metrics discovered in the files.]
-## 🗺️ Section 3: Step-by-Step Migration Map
+## 💡 Section 3: First Principles & "The Algorithm" Deconstruction
+[Explicitly apply "The Algorithm": List requirements/parts of the design to delete/simplify, constraints to question, and optimized cycle acceleration paths.]
+## 🗺️ Section 4: Step-by-Step Migration Map
 [Provide an explicit, sequential chronological plan of exactly which files to create, edit, or split — organized in dry-run milestones.]
-## 🛡️ Section 4: Type-Safe Interfaces & Specifications
+## 🛡️ Section 5: Type-Safe Interfaces & Specifications
 [Detail precise TypeScript interface schemas, named export contracts, or standard signatures representing the migrated modules.]
 
 Output ONLY the markdown content list. No conversational introductions or notes outside the markdown blocks.`;
