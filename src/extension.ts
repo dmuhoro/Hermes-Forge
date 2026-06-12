@@ -210,6 +210,14 @@ export function activate(context: vscode.ExtensionContext) {
     });
     context.subscriptions.push(perfAuditCommand);
 
+    // Register Codebase Oracle Mode
+    const codebaseOracleCommand = vscode.commands.registerCommand('hermes-forge.codebaseOracle', async () => {
+        const { CodebaseOracle } = await import('./services/CodebaseOracle');
+        const oracle = new CodebaseOracle(ollama);
+        await oracle.consultOracle();
+    });
+    context.subscriptions.push(codebaseOracleCommand);
+
     // Register Git PR Generator
     const prSummaryCommand = vscode.commands.registerCommand('hermes-forge.generatePrSummary', async () => {
         const prGen = new PRGenerator(ollama);

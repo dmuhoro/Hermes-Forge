@@ -4,6 +4,20 @@
 
 HermesForge merges the capabilities of real-time Context Chat (Cursor), Agentic Execution (Claude Code), and Inline Autocomplete (Codex)—all powered entirely 100% offline via local LLM instances utilizing the Ollama API layer.
 
+---
+
+## 💎 Why Hermes-Forge?
+
+In the current landscape of AI-powered development, tools like Cursor, GitHub Copilot, and Claude Code are revolutionary—but they represent high-overhead, cloud-bound ecosystems. HermesForge is designed differently, championing local sovereignty and developer autonomy:
+
+- **Absolute Privacy Shield (0 Bits Sent to the Cloud)**: Your company IP, proprietary algorithms, and sensitive database configurations never leave your machine. Ideal for compliance-critical environments, defense development, or private healthcare applications.
+- **Zero Operating Costs (100% Free Forever)**: By substituting expensive monthly subscriptions ($20–$40/user/month) and high-concurrency API token billing with consumer-grade local weights, developers gain a cutting-edge assistant with zero financial headwinds.
+- **Resilient Offline Dignity**: Built with the unique needs of developers in emerging tech hubs like Nairobi, Lagos, and Bangalore in mind. HermesForge operates at peak efficiency on local commuter trains, in remote areas with unstable grid connections, and during severe fiber-optic internet outages.
+- **Hardware-Friendly Lifecycle & Green AI**: Engineered specifically to run on everyday hardware, such as basic Apple M-series chips or standard mid-range desktop CPUs. Features like **AbortController Connection Slicing** intercept keystrokes dynamically, meaning we never waste GPU thermal cycles or battery power.
+- **Architectural Codebase Mastery**: While modern cloud engines get distracted by massive token inputs, our local hierarchical project indexing, bento agent missions, and **Codebase Oracle** modes provide deep, structured migration planning and optimization tailored for real-world codebases.
+
+---
+
 ```text
  ┌──────────────────────────────────────┐  ┌──────────────────────────────────────┐
  │          1. CONTEXT CHAT             │  │      2. EXECUTIVE CONTROL CENTER     │
@@ -52,6 +66,38 @@ Customize connection URLs, context heights, or model candidates dynamically insi
 | `hermes-forge.ollamaBaseUrl` | `http://localhost:11434` | The target local URL address running Ollama. |
 | `hermes-forge.modelCompletion` | `qwen2.5-coder:1.5b` | Ultra-low latency model utilized for rapid inline autocompletion. |
 | `hermes-forge.modelChat` | `hermes3:8b` | Strong reasoning model used for chat conversations and multi-agent systems. |
+
+---
+
+## 🚦 First Run Quickstart Guide
+
+Getting HermesForge up and running on your local machine is simple. Follow these steps:
+
+1. **Start Ollama**: Make sure Ollama is installed and running on your device (visit [ollama.com](https://ollama.com) to download standard installers). Verify it is accessible via:
+   ```bash
+   curl http://localhost:11434
+   ```
+2. **Download Recommended Models**: Run the following commands in your terminal to download the optimized model files:
+   ```bash
+   ollama pull qwen2.5-coder:1.5b
+   ollama pull hermes3:8b
+   ```
+3. **Launch VS Code with HermesForge**: Package and install the extension `.vsix` as described below.
+4. **Trigger Autocomplete**: Open any code document and start typing. Suggestions will show inline like native Ghost Text. Press `Tab` to accept!
+5. **Open Sidebar Dashboard**: Click the Robot icon (`$(hubot)`) in your VS Code Activity Bar to access the interactive Context Chat and Executive Control Center panel.
+
+---
+
+## 🧠 Recommended Models Matrix
+
+HermesForge is optimized for split-brain, split-model execution. Choosing the right weights balances local inference speed with reasoning fidelity:
+
+| Workflow Profile | Recommended Model Weights | Disk Size | Target Hardware Specs |
+| :--- | :--- | :--- | :--- |
+| **Ultra-fast Autocomplete** | `qwen2.5-coder:1.5b` | ~980 MB | Runs on any Apple Silicon or modern CPU |
+| **Standard Setup Agent** | `hermes3:8b` | ~4.7 GB | Apple M-series (8GB+ unified RAM) or dedicated GPU |
+| **High Reasoning Chat** | `deepseek-r1:8b` | ~4.7 GB | Excellent for deep-dive refactoring, debugging, & math |
+| **Low Resource Fallback** | `llama3.2:3b` | ~2.0 GB | Ultra-lightweight profile tailored for laptops on battery |
 
 ---
 

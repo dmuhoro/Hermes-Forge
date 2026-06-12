@@ -410,6 +410,38 @@ When task is finished or satisfied, respond exactly: Done.`;
     }
 
     /**
+     * Checkpoint serialization helpers to enable superior agentic loops with long-running task persistence.
+     */
+    private getCheckpointPath(): string {
+        return path.join(this.getWorkspaceRoot(), '.telemetry', 'agent_checkpoint.json');
+    }
+
+    private async saveCheckpoint(goal: string, steps: PlannedStep[], currentStepIndex: number, sharedMemoryContext: string): Promise<void> {
+        try {
+            const cpPath = this.getCheckpointPath();
+            await fs.mkdir(path.dirname(cpPath), { recursive: true });
+            const checkpointData = {
+                goal,
+                steps,
+                currentStepIndex,
+                sharedMemoryContext,
+                timestamp: new Date().toISOString()
+            };
+            await fs.writeFile(cpPath, JSON.stringify(checkpointData, null, 2), 'utf8');
+            this.outputChannel.appendLine(`💾 [Checkpoint Persistence]: Progress checkpoint saved for step ${currentStepIndex + 2} of ${steps.length}`);
+        } catch (err: any) {
+            logger.warn(`Failed to write agent state checkpoint: ${err.message}`);
+        }
+    }
+
+    private async clearCheckpoint(): Promise<void> {
+        try {
+            const cpPath = this.getCheckpointPath();
+            await fs.unlink(cpPath).catch(() => {});
+        } catch {}
+    }
+
+    /**
      * Strategic Task Partitioning (Planner Agent)
      */
     private async generateProjectPlan(goal: string): Promise<PlannedStep[]> {
@@ -475,19 +507,54 @@ Example Schema:
         // Reset system structures
         this.fileBackups.clear();
         
-        // 1. Task Planning
-        const steps = await this.generateProjectPlan(goal);
-        this.outputChannel.appendLine(`[Multi-Agent Planner]: Resolved scaffold into ${steps.length} cohesive steps:`);
-        for (const step of steps) {
-            this.outputChannel.appendLine(`  Step [${step.id}]: [Agent Persona: ${step.persona}] File: ${step.file || 'Dynamic'} -> ${step.task}`);
-        }
-        this.outputChannel.appendLine('=========================================\n');
-
+        // 1. Incomplete Session Checkpointing Check
+        let steps: PlannedStep[] = [];
+        let startStepIndex = 0;
         let sharedMemoryContext = '';
+        let actualGoal = goal;
+
+        try {
+            const cpPath = this.getCheckpointPath();
+            const exists = await fs.stat(cpPath).then(() => true).catch(() => false);
+            if (exists) {
+                const cpContent = await fs.readFile(cpPath, 'utf8');
+                const checkpoint = JSON.parse(cpContent);
+                
+                const response = await vscode.window.showWarningMessage(
+                    `Incomplete agent task session found: "${checkpoint.goal}". Would you like to resume?`,
+                    'Resume Session',
+                    'Discard & Start Fresh'
+                );
+
+                if (response === 'Resume Session') {
+                    actualGoal = checkpoint.goal;
+                    steps = checkpoint.steps;
+                    startStepIndex = checkpoint.currentStepIndex + 1;
+                    sharedMemoryContext = checkpoint.sharedMemoryContext;
+                    this.outputChannel.appendLine(`✨ [Checkpoint Restored]: Resuming session for goal "${actualGoal}" starting at Step ${startStepIndex + 1} of ${steps.length}`);
+                } else {
+                    await this.clearCheckpoint();
+                }
+            }
+        } catch (err: any) {
+            logger.warn(`Error resolving task checkpoints: ${err.message}`);
+        }
+
+        // If not resuming, initialize planning normally
+        if (steps.length === 0) {
+            steps = await this.generateProjectPlan(actualGoal);
+            this.outputChannel.appendLine(`[Multi-Agent Planner]: Resolved scaffold into ${steps.length} cohesive steps:`);
+            for (const step of steps) {
+                this.outputChannel.appendLine(`  Step [${step.id}]: [Agent Persona: ${step.persona}] File: ${step.file || 'Dynamic'} -> ${step.task}`);
+            }
+            this.outputChannel.appendLine('=========================================\n');
+        }
+
         const filesChangedInTransaction = new Set<string>();
 
         // 2. Delegation & Execution Loop
-        for (const step of steps) {
+        for (let i = startStepIndex; i < steps.length; i++) {
+            const step = steps[i];
             this.outputChannel.appendLine(`🏁 [Step ${step.id}/${steps.length}] Dispatching to specialized ${step.persona.toUpperCase()} agent...`);
             
             const localizedGoal = `Assemble and deliver. Step goal: "${step.task}".\nProgress Ledger/Shared Memory so far:\n${sharedMemoryContext}`;
@@ -518,7 +585,7 @@ Example Schema:
             }
 
             // Run automated testing verification checks if this is deep logic or has tests
-            if (step.persona === 'test' || goal.toLowerCase().includes('test')) {
+            if (step.persona === 'test' || actualGoal.toLowerCase().includes('test')) {
                 this.outputChannel.appendLine('  - Executing automated vitest loops (npm test)...');
                 const testsPass = await verifier.verifyAndHeal(this.getWorkspaceRoot(), 'npm test', 2);
                 if (!testsPass) {
@@ -527,7 +594,13 @@ Example Schema:
             }
             
             this.outputChannel.appendLine(`✨ Step ${step.id} successfully verified and consolidated.`);
+            
+            // Save Progress checkpoint so we can resume if interrupted
+            await this.saveCheckpoint(actualGoal, steps, i, sharedMemoryContext);
         }
+
+        // Clear checkpoint upon successful completion
+        await this.clearCheckpoint();
 
         // 3. Draft PR Summary and Changelog Output
         this.outputChannel.appendLine('\n=========================================');

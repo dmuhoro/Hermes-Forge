@@ -19,11 +19,16 @@
     ],
     "moduleResolution": "node"
   },
+  "include": [
+    "src/**/*.ts"
+  ],
   "exclude": [
     "node_modules",
     "dist",
     "out",
     "vitest.config.ts",
-    "eslint.config.js"
+    "eslint.config.js",
+    "src/__tests__/**/*",
+    "src/**/*.test.ts"
   ]
 }

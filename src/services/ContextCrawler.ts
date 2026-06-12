@@ -9,13 +9,30 @@ export interface SemanticChunk {
     score: number;
 }
 
+export interface SubModuleSummary {
+    dirPath: string;
+    fileCount: number;
+    totalLines: number;
+    techStackFingerprints: string[];
+    purposeSummary: string;
+    keyFiles: string[];
+}
+
+export interface ProjectMemory {
+    workspaceRoot: string;
+    timestamp: string;
+    totalFiles: number;
+    totalLines: number;
+    subModules: { [dirPath: string]: SubModuleSummary };
+}
+
 export class ContextCrawler {
     private visited = new Set<string>();
 
     private async isTextFile(filePath: string): Promise<boolean> {
         const ext = path.extname(filePath).toLowerCase();
         // Skip common binary and media extensions
-        const nonTextExts = ['.png', '.jpg', '.jpeg', '.gif', '.mp4', '.pdf', '.zip', '.tar', '.gz', '.bin', '.exe', '.dll', '.woff', '.woff2', '.ttf'];
+        const nonTextExts = ['.png', '.jpg', '.jpeg', '.gif', '.mp4', '.pdf', '.zip', '.tar', '.gz', '.bin', '.exe', '.dll', '.woff', '.woff2', '.ttf', '.png', '.ico'];
         return !nonTextExts.includes(ext);
     }
 
@@ -41,7 +58,7 @@ export class ContextCrawler {
             // Attempt to resolve file with common TypeScript/JavaScript extensions if lacking
             let finalPath = filePath;
             if (!(await this.fileExists(finalPath))) {
-                const exts = ['.ts', '.tsx', '.js', '.jsx'];
+                const exts = ['.ts', '.tsx', '.js', '.jsx', '.py', '.rs', '.go'];
                 let found = false;
                 for (const ext of exts) {
                     if (await this.fileExists(filePath + ext)) {
@@ -55,7 +72,7 @@ export class ContextCrawler {
             }
 
             // Exclude node_modules explicitly
-            if (finalPath.includes('node_modules')) {
+            if (finalPath.includes('node_modules') || finalPath.includes('.git') || finalPath.includes('dist')) {
                 return dependencies;
             }
 
@@ -115,7 +132,7 @@ export class ContextCrawler {
                 const compressedText = ContextCrawler.summarizeCode(text, limitPerDependency);
                 expandedContext += `\n// START DEPENDENCY: [${relName}]\n${compressedText}\n// END DEPENDENCY\n`;
             } catch {
-                // Fixed unused variable warning
+                // Ignore missing files safely
             }
         }
         
@@ -185,27 +202,58 @@ export class ContextCrawler {
 
     /**
      * Statically chunk complex codebase files based on declarations and line numbers.
+     * Enhances compatibility with multiple languages (Python, Go, Rust, Java, C++, Markdown)
      */
     public static chunkFile(filePath: string, content: string): SemanticChunk[] {
         const chunks: SemanticChunk[] = [];
         const lines = content.split(/\r?\n/);
         let currentChunkLines: string[] = [];
         let currentScope = 'root';
+        const ext = path.extname(filePath).toLowerCase();
         
         for (const line of lines) {
             const trimmed = line.trim();
             
-            // Regex to isolate structural declarations
-            const classMatch = trimmed.match(/^export\s+class\s+(\w+)|^class\s+(\w+)/);
-            const funcMatch = trimmed.match(/^(?:export\s+)?(?:public|private|protected|static|async)?\s*function\s+(\w+)|^(?:export\s+)?const\s+(\w+)\s*=\s*(?:async\s*)?\(/);
-            const interfaceMatch = trimmed.match(/^export\s+interface\s+(\w+)|^interface\s+(\w+)/);
-            
-            if (classMatch) {
-                currentScope = `class:${classMatch[1] || classMatch[2]}`;
-            } else if (funcMatch) {
-                currentScope = `function:${funcMatch[1] || funcMatch[2]}`;
-            } else if (interfaceMatch) {
-                currentScope = `interface:${interfaceMatch[1] || interfaceMatch[2]}`;
+            // Multilingual structural declaration support
+            if (ext === '.ts' || ext === '.tsx' || ext === '.js' || ext === '.jsx') {
+                const classMatch = trimmed.match(/^export\s+class\s+(\w+)|^class\s+(\w+)/);
+                const funcMatch = trimmed.match(/^(?:export\s+)?(?:public|private|protected|static|async)?\s*function\s+(\w+)|^(?:export\s+)?const\s+(\w+)\s*=\s*(?:async\s*)?\(/);
+                const interfaceMatch = trimmed.match(/^export\s+interface\s+(\w+)|^interface\s+(\w+)/);
+                
+                if (classMatch) currentScope = `class:${classMatch[1] || classMatch[2]}`;
+                else if (funcMatch) currentScope = `function:${funcMatch[1] || funcMatch[2]}`;
+                else if (interfaceMatch) currentScope = `interface:${interfaceMatch[1] || interfaceMatch[2]}`;
+            } else if (ext === '.py') {
+                const classMatch = trimmed.match(/^class\s+(\w+)/);
+                const defMatch = trimmed.match(/^def\s+(\w+)/);
+                
+                if (classMatch) currentScope = `class:${classMatch[1]}`;
+                else if (defMatch) currentScope = `def:${defMatch[1]}`;
+            } else if (ext === '.rs') {
+                const fnMatch = trimmed.match(/^(?:pub\s+(?:\(crate\)\s+)?)?fn\s+(\w+)/);
+                const structMatch = trimmed.match(/^(?:pub\s+)?struct\s+(\w+)/);
+                const implMatch = trimmed.match(/^impl(?:\s+<\w+>)?\s+(\w+)/);
+                
+                if (fnMatch) currentScope = `fn:${fnMatch[1]}`;
+                else if (structMatch) currentScope = `struct:${structMatch[1]}`;
+                else if (implMatch) currentScope = `impl:${implMatch[1]}`;
+            } else if (ext === '.go') {
+                const funcMatch = trimmed.match(/^func\s+(?:\(.*?\)\s+)?(\w+)/);
+                const typeMatch = trimmed.match(/^type\s+(\w+)\s+(?:struct|interface)/);
+                
+                if (funcMatch) currentScope = `func:${funcMatch[1]}`;
+                else if (typeMatch) currentScope = `type:${typeMatch[1]}`;
+            } else if (ext === '.java' || ext === '.cs' || ext === '.cpp' || ext === '.c' || ext === '.h') {
+                const classMatch = trimmed.match(/^(?:public|private|protected|internal|static|class)\s+class\s+(\w+)/);
+                const methodMatch = trimmed.match(/^(?:public|private|protected|static|virtual|override|async)\s+[\w<>]+\s+(\w+)\s*\(/);
+                
+                if (classMatch) currentScope = `class:${classMatch[1]}`;
+                else if (methodMatch) currentScope = `method:${methodMatch[1]}`;
+            } else if (ext === '.md') {
+                const headingMatch = trimmed.match(/^(#+)\s+(.+)$/);
+                if (headingMatch) {
+                    currentScope = `heading:${headingMatch[2]}`;
+                }
             }
             
             currentChunkLines.push(line);
@@ -242,17 +290,32 @@ export class ContextCrawler {
         const programmingStopwords = new Set([
             'and', 'the', 'for', 'let', 'const', 'var', 'class', 'interface', 'import', 'export', 
             'from', 'this', 'return', 'function', 'async', 'await', 'public', 'private', 'protected',
-            'true', 'false', 'null', 'undefined', 'this', 'with', 'static', 'extends', 'implements'
+            'true', 'false', 'null', 'undefined', 'with', 'static', 'extends', 'implements'
         ]);
         return words.filter(word => !programmingStopwords.has(word));
     }
 
     /**
-     * Ranks all codebase chunks offline using a full high-fidelity in-memory Term Frequency-Inverse Document Frequency
-     * cosine similarity metric relative to the user query.
+     * Builds and updates an offline ProjectMemory database saved inside `.telemetry/project_memory.json`
      */
-    public async searchWorkspace(workspaceRoot: string, query: string, topN: number = 6): Promise<SemanticChunk[]> {
+    public async buildOrLoadProjectMemory(workspaceRoot: string, forceRebuild = false): Promise<ProjectMemory> {
+        const telemetryDir = path.join(workspaceRoot, '.telemetry');
+        const memoryPath = path.join(telemetryDir, 'project_memory.json');
+        
+        // Load existing if possible and not forced
+        if (!forceRebuild) {
+            try {
+                const data = await fs.readFile(memoryPath, 'utf8');
+                return JSON.parse(data);
+            } catch {
+                // If missing, continue to build dynamically
+            }
+        }
+        
+        logger.info(`[ContextCrawler] Generating Offline Hierarchical Project Memory at: ${memoryPath}`);
+        
         const fileList: string[] = [];
+        const dirMap = new Map<string, string[]>();
         
         const scan = async (dir: string) => {
             let items: string[] = [];
@@ -262,7 +325,7 @@ export class ContextCrawler {
                 return;
             }
             for (const item of items) {
-                if (item === 'node_modules' || item === 'dist' || item === '.git' || item === 'out' || item === 'build' || item === '.next') {
+                if (item === 'node_modules' || item === 'dist' || item === '.git' || item === 'out' || item === 'build' || item === '.next' || item === '.telemetry') {
                     continue;
                 }
                 const fullPath = path.join(dir, item);
@@ -272,15 +335,165 @@ export class ContextCrawler {
                         await scan(fullPath);
                     } else if (stat.isFile()) {
                         const ext = path.extname(item).toLowerCase();
-                        if (['.ts', '.tsx', '.js', '.jsx'].includes(ext)) {
+                        const allowedExts = [
+                            '.ts', '.tsx', '.js', '.jsx', '.py', '.rs', '.go', 
+                            '.java', '.cpp', '.c', '.h', '.cs', '.rb', '.php', 
+                            '.swift', '.kt', '.sh', '.md', '.json', '.yaml', '.yml'
+                        ];
+                        if (allowedExts.includes(ext)) {
+                            fileList.push(fullPath);
+                            
+                            const dirPath = path.dirname(fullPath);
+                            const relativeDir = path.relative(workspaceRoot, dirPath) || '.';
+                            if (!dirMap.has(relativeDir)) {
+                                dirMap.set(relativeDir, []);
+                            }
+                            dirMap.get(relativeDir)!.push(fullPath);
+                        }
+                    }
+                } catch {
+                    // Ignore inaccessible files
+                }
+            }
+        };
+        
+        await scan(workspaceRoot);
+        
+        let totalLines = 0;
+        const subModules: { [dirPath: string]: SubModuleSummary } = {};
+        
+        for (const [relDir, files] of dirMap.entries()) {
+            let modLines = 0;
+            const fingerPrints = new Set<string>();
+            const keyFiles: string[] = [];
+            
+            for (const f of files) {
+                try {
+                    const content = await fs.readFile(f, 'utf8');
+                    const linesCount = content.split('\n').length;
+                    modLines += linesCount;
+                    totalLines += linesCount;
+                    
+                    if (content.includes('import * as vscode') || content.includes("require('vscode')")) fingerPrints.add('VS Code API');
+                    if (content.includes('react') || content.includes('React')) fingerPrints.add('React');
+                    if (content.includes('vitest') || content.includes('describe(')) fingerPrints.add('Testing Suite');
+                    if (content.includes('ollama') || content.includes('OllamaClient')) fingerPrints.add('Ollama AI');
+                    if (content.includes('express') || content.includes('http.createServer')) fingerPrints.add('Web Service Server');
+                    
+                    keyFiles.push(path.basename(f));
+                } catch {
+                    // Ignore failures
+                }
+            }
+            
+            // Heuristic purpose statement based on folder name & content fingerprints
+            let purpose = 'Workspace directory containing utility and configuration items.';
+            if (relDir.includes('service')) purpose = 'Architectural backend services implementing local networking pipelines or core logic.';
+            else if (relDir.includes('module') || relDir.includes('provider')) purpose = 'UX Modules enabling system events, editors, or custom interfaces.';
+            else if (relDir.includes('test')) purpose = 'Suite of automated unit and integration tests validating code contracts and performance benchmarks.';
+            else if (relDir.includes('utils') || relDir.includes('helper')) purpose = 'Lightweight modular code blocks protecting exception bounds or logging telemetry.';
+            
+            subModules[relDir] = {
+                dirPath: relDir,
+                fileCount: files.length,
+                totalLines: modLines,
+                techStackFingerprints: Array.from(fingerPrints),
+                purposeSummary: purpose,
+                keyFiles: keyFiles.slice(0, 5) // Top 5 key files
+            };
+        }
+        
+        const projectMemory: ProjectMemory = {
+            workspaceRoot,
+            timestamp: new Date().toISOString(),
+            totalFiles: fileList.length,
+            totalLines,
+            subModules
+        };
+        
+        try {
+            await fs.mkdir(telemetryDir, { recursive: true });
+            await fs.writeFile(memoryPath, JSON.stringify(projectMemory, null, 2), 'utf8');
+            logger.info('[ContextCrawler] Saved updated Workspace Memory hierarchy successfully.');
+        } catch (err: any) {
+            logger.warn(`Failed writing project memory: ${err.message}`);
+        }
+        
+        return projectMemory;
+    }
+
+    /**
+     * Ranks all codebase chunks offline using a full high-fidelity in-memory Term Frequency-Inverse Document Frequency
+     * cosine similarity metric. Supports "Large Repository Mode" where folders are pre-filtered based on query terms.
+     */
+    public async searchWorkspace(workspaceRoot: string, query: string, topN: number = 6): Promise<SemanticChunk[]> {
+        const memory = await this.buildOrLoadProjectMemory(workspaceRoot);
+        const isLargeRepo = memory.totalLines > 5000 || memory.totalFiles > 20;
+        
+        let targetDirectories = Object.keys(memory.subModules);
+        
+        if (isLargeRepo) {
+            logger.info(`⚡ [Large Repository Mode] Triggered recursively: ~${memory.totalLines} lines across ${memory.totalFiles} files. Activating hierarchical directory filtration.`);
+            
+            // Query vector tokenization
+            const queryTokens = this.tokenize(query);
+            
+            // Score directories to isolate relevant directories
+            const rankedDirectories = targetDirectories.map(dir => {
+                const subMod = memory.subModules[dir];
+                let matchScore = 0;
+                
+                // Boost match if directory path matches keyword
+                for (const tok of queryTokens) {
+                    if (dir.toLowerCase().includes(tok)) matchScore += 10;
+                    if (subMod.purposeSummary.toLowerCase().includes(tok)) matchScore += 5;
+                    for (const fp of subMod.techStackFingerprints) {
+                        if (fp.toLowerCase().includes(tok)) matchScore += 3;
+                    }
+                    for (const kf of subMod.keyFiles) {
+                        if (kf.toLowerCase().includes(tok)) matchScore += 2;
+                    }
+                }
+                return { dir, score: matchScore };
+            });
+            
+            // Filter target directories down to those with score > 0 fallback of top 3 if none match
+            const sortedDirs = rankedDirectories.sort((a, b) => b.score - a.score);
+            const matchingDirs = sortedDirs.slice(0, 3).map(d => d.dir);
+            if (matchingDirs.length > 0) {
+                targetDirectories = matchingDirs;
+                logger.info(`⚡ [Large Repository Mode] Restricting deep file scanning to top matched sub-modules: [${targetDirectories.join(', ')}]`);
+            }
+        }
+        
+        const fileList: string[] = [];
+        for (const dir of targetDirectories) {
+            const fullDir = path.resolve(workspaceRoot, dir);
+            try {
+                const items = await fs.readdir(fullDir);
+                for (const item of items) {
+                    const fullPath = path.join(fullDir, item);
+                    const stat = await fs.stat(fullPath);
+                    if (stat.isFile()) {
+                        const ext = path.extname(item).toLowerCase();
+                        const allowedExts = [
+                            '.ts', '.tsx', '.js', '.jsx', '.py', '.rs', '.go', 
+                            '.java', '.cpp', '.c', '.h', '.cs', '.rb', '.php', 
+                            '.swift', '.kt', '.sh', '.md'
+                        ];
+                        if (allowedExts.includes(ext)) {
                             fileList.push(fullPath);
                         }
                     }
-                } catch {}
+                }
+            } catch {
+                // Silently skip inaccessible sub-dirs
             }
-        };
-
-        await scan(workspaceRoot);
+        }
+        
+        if (fileList.length === 0) {
+            return [];
+        }
         
         const allChunks: SemanticChunk[] = [];
         for (const file of fileList) {
@@ -288,7 +501,9 @@ export class ContextCrawler {
                 const text = await fs.readFile(file, 'utf8');
                 const chunks = ContextCrawler.chunkFile(file, text);
                 allChunks.push(...chunks);
-            } catch {}
+            } catch {
+                // Skip unreadable files
+            }
         }
 
         if (allChunks.length === 0) return [];
@@ -409,7 +624,7 @@ export class ContextCrawler {
                         await scan(fullPath);
                     } else if (stat.isFile()) {
                         const ext = path.extname(item).toLowerCase();
-                        if (['.ts', '.tsx', '.js', '.jsx', '.json'].includes(ext)) {
+                        if (['.ts', '.tsx', '.js', '.jsx', '.json', '.py', '.rs', '.go', '.java'].includes(ext)) {
                             fileList.push(fullPath);
                             
                             if (ext !== '.json') {
@@ -442,7 +657,9 @@ export class ContextCrawler {
                             }
                         }
                     }
-                } catch {}
+                } catch {
+                    // Skip failures
+                }
             }
         };
 
@@ -459,7 +676,9 @@ export class ContextCrawler {
                 if (dep.includes('mocha') || dep.includes('jest') || dep.includes('vitest')) techStackSet.add('Testing Suite');
                 if (dep.includes('vite')) techStackSet.add('Vite Build Engine');
             }
-        } catch {}
+        } catch {
+            // Skip config failures
+        }
 
         if (techStackSet.size === 0) {
             techStackSet.add('Standard Node.js Runtime');
@@ -514,13 +733,20 @@ ${fileList.slice(0, 12).map(f => `  - \`${path.relative(workspaceRoot, f)}\``).j
                     results.push(...subFiles);
                 } else {
                     const ext = path.extname(fullPath).toLowerCase();
-                    const textExtensions = ['.ts', '.js', '.json', '.md', '.tsx', '.jsx', '.css', '.html', '.txt', '.yaml', '.yml', '.xml', '.example'];
+                    const textExtensions = [
+                        '.ts', '.js', '.json', '.md', '.tsx', '.jsx', '.css', 
+                        '.html', '.txt', '.yaml', '.yml', '.xml', '.example', 
+                        '.py', '.rs', '.go', '.java', '.cpp', '.c', '.h', '.cs', '.sh'
+                    ];
                     if (textExtensions.includes(ext)) {
                         results.push(fullPath);
                     }
                 }
             }
-        } catch {}
+        } catch {
+            // Fail safe
+        }
         return results;
     }
 }
+

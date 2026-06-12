@@ -36,7 +36,8 @@
     "onCommand:hermes-forge.perfAudit",
     "onCommand:hermes-forge.benchmarkHardware",
     "onCommand:hermes-forge.generatePrSummary",
-    "onCommand:hermes-forge.exportContext"
+    "onCommand:hermes-forge.exportContext",
+    "onCommand:hermes-forge.codebaseOracle"
   ],
   "main": "./dist/extension.js",
   "contributes": {
@@ -74,6 +75,11 @@
       {
         "command": "hermes-forge.exportContext",
         "title": "HermesForge: Export Workspace Context for External Agents",
+        "category": "HermesForge"
+      },
+      {
+        "command": "hermes-forge.codebaseOracle",
+        "title": "HermesForge: Scan Architectural Blueprint & Migration Paths",
         "category": "HermesForge"
       }
     ],
